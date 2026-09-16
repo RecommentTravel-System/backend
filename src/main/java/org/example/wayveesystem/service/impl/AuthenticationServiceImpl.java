@@ -273,7 +273,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private String generateAccessToken(User user) {
-        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(String.valueOf(user.getUserId()))
@@ -299,7 +299,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private String generateRefreshToken(User user) {
-        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(String.valueOf(user.getUserId()))
@@ -324,7 +324,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private String generateResetPasswordToken(User user) {
-        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(String.valueOf(user.getUserId()))
                 .issuer("wayveesystem.com")
