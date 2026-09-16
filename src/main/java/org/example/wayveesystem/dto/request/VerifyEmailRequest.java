@@ -1,18 +1,20 @@
 package org.example.wayveesystem.dto.request;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class AuthenticationRequest {
-    @NotBlank(message = "Email is required")
+public class VerifyEmailRequest {
+    @NotBlank(message = "EMAIL_REQUIRED")
+    @Email(message = "INVALID_EMAIL")
     String email;
 
-    @NotBlank(message = "Password is required")
-    String password;
+    @NotBlank(message = "OTP_REQUIRED")
+    String otp;
 }

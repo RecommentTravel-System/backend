@@ -3,6 +3,7 @@ package org.example.wayveesystem.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -21,9 +22,6 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
     Long userId;
-
-    @Column(name = "username", unique = true, nullable = false)
-    String username;
 
     @Column(name = "email", unique = true, nullable = false)
     String email;
@@ -44,4 +42,8 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     UserStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    Role role;
 }

@@ -16,6 +16,7 @@ import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.request.*;
 import org.example.wayveesystem.dto.response.AuthenticationResponse;
 import org.example.wayveesystem.dto.response.IntrospectResponse;
+import org.example.wayveesystem.dto.response.ResetOtpResponse;
 import org.example.wayveesystem.dto.response.UserResponse;
 import org.example.wayveesystem.entity.InvalidatedToken;
 import org.example.wayveesystem.entity.User;
@@ -23,7 +24,10 @@ import org.example.wayveesystem.mapper.UserMapper;
 import org.example.wayveesystem.respository.InvalidatedTokenRepository;
 import org.example.wayveesystem.respository.UserRepository;
 import org.example.wayveesystem.service.AuthenticationService;
+import org.example.wayveesystem.service.EmailService;
+import org.example.wayveesystem.service.OtpService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +47,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     PasswordEncoder passwordEncoder;
     UserMapper userMapper;
     InvalidatedTokenRepository invalidatedTokenRepository;
+    OtpService otpService;
+    EmailService emailService;
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -52,14 +58,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_EXISTED);
         }
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new AppException(ErrorCode.USERNAME_EXISTED);
-        }
     }
 
     private void validateUserStatus(User user) {
         if (user.getStatus() != UserStatus.ACTIVE) {
-            if (user.getStatus() == UserStatus.INACTIVE) {
+            if (user.getStatus() == UserStatus.PENDING) {
+                throw new AppException(ErrorCode.USER_NOT_VERIFIED);
+            } else if (user.getStatus() == UserStatus.INACTIVE) {
                 throw new AppException(ErrorCode.USER_INACTIVE);
             } else if (user.getStatus() == UserStatus.SUSPENDED) {
                 throw new AppException(ErrorCode.USER_SUSPENDED);
@@ -73,15 +78,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public UserResponse createUserAccount(UserCreationRequest request) {
         validateUserCreation(request);
         User user = userMapper.toUser(request);
+        user.setStatus(UserStatus.PENDING);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setStatus(UserStatus.ACTIVE);
         User savedUser = userRepository.save(user);
+
+        String otp = otpService.generateOtp(savedUser.getEmail());
+        emailService.sendVerifyEmailOtp(savedUser.getEmail(), otp);
+
         return userMapper.toUserResponse(savedUser);
     }
 
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        var user = userRepository.findByUsernameOrEmail(request.getUsernameOrEmail(), request.getUsernameOrEmail())
+        var user = userRepository.findByEmail(request.getEmail(), request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         validateUserStatus(user);
@@ -99,6 +108,107 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .build();
+    }
+
+    @Override
+    public void verifyEmail(String email, String otp) {
+        otpService.verifyOtp(email, otp);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_VERIFIED);
+        }
+
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+    }
+
+    @Override
+    public void resendOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_VERIFIED);
+        }
+
+        String otp = otpService.resendOtp(email);
+        emailService.sendVerifyEmailOtp(email, otp);
+    }
+
+    @Override
+    public void forgotPassword(OtpRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        String otp = otpService.generateOtp(user.getEmail());
+        emailService.sendForgotPasswordOtp(user.getEmail(), otp);
+    }
+
+    @Override
+    public ResetOtpResponse verifyResetOtp(VerifyEmailRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        otpService.verifyOtp(request.getEmail(), request.getOtp());
+        String resetToken = generateResetPasswordToken(user);
+        return ResetOtpResponse.builder()
+                .resetToken(resetToken)
+                .build();
+    }
+
+    private void validateNewPassword(String newPassword, String confirmPassword, String currentPassword) {
+        if (!newPassword.equals(confirmPassword)) {
+            throw new AppException(ErrorCode.PASSWORD_CONFIRM_NOT_MATCH);
+        }
+
+        if (passwordEncoder.matches(newPassword, currentPassword)) {
+            throw new AppException(ErrorCode.PASSWORD_SAME_AS_OLD);
+        }
+    }
+
+    @Override
+    public void changePassword(PasswordUpdateRequest request) {
+        String userIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findById(Long.valueOf(userIdStr))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.PASSWORD_INCORRECT);
+        }
+
+        validateNewPassword(request.getNewPassword(), request.getConfirmNewPassword(), user.getPassword());
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    @Override
+    public void resetPassword(ResetPasswordRequest request) throws ParseException, JOSEException {
+        SignedJWT signedJWT = verifyResetPasswordToken(request.getResetToken());
+        String userIdStr;
+
+        try {
+            userIdStr = signedJWT.getJWTClaimsSet().getSubject();
+        } catch (ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+
+        User user = userRepository.findById(Long.valueOf(userIdStr))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        validateNewPassword(request.getNewPassword(), request.getConfirmNewPassword(), user.getPassword());
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        String jwtTokenId = signedJWT.getJWTClaimsSet().getJWTID();
+        Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
+                .id(jwtTokenId)
+                .expiryTime(expirationTime)
+                .build();
+
+        invalidatedTokenRepository.save(invalidatedToken);
     }
 
     @Override
@@ -213,6 +323,30 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         return jwsObject.serialize();
     }
 
+    private String generateResetPasswordToken(User user) {
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject(String.valueOf(user.getUserId()))
+                .issuer("wayveesystem.com")
+                .issueTime(new Date())
+                .expirationTime(new Date(
+                        Instant.now().plus(15, ChronoUnit.MINUTES).toEpochMilli()
+                ))
+                .jwtID(UUID.randomUUID().toString())
+                .claim("scope", "RESET_PASSWORD")
+                .build();
+
+        JWSObject jwsObject = new JWSObject(header, new Payload(claims.toJSONObject()));
+
+        try {
+            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
+        } catch (JOSEException e) {
+            log.error("Cannot create reset password token", e);
+            throw new RuntimeException(e);
+        }
+        return jwsObject.serialize();
+    }
+
     private SignedJWT verifyToken(String token) throws JOSEException, ParseException {
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
         SignedJWT signedJWT = SignedJWT.parse(token);
@@ -229,5 +363,23 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         return signedJWT;
+    }
+
+    private SignedJWT verifyResetPasswordToken(String token) throws ParseException, JOSEException {
+        SignedJWT signedJWT = verifyToken(token);
+
+        try {
+            String scope = signedJWT.getJWTClaimsSet().getStringClaim("scope");
+            if (!"RESET_PASSWORD".equals(scope)) {
+                log.warn("Reset password token invalid scope: {}", scope);
+                throw new AppException(ErrorCode.INVALID_TOKEN);
+            }
+
+            return signedJWT;
+
+        } catch (ParseException e) {
+            log.warn("Invalid token: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
     }
 }

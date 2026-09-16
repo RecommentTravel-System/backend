@@ -13,7 +13,6 @@ public class UserMapper {
             return null;
         }
         return User.builder()
-                .username(request.getUsername())
                 .email(request.getEmail())
                 .password(request.getPassword())
                 .fullName(request.getFullName())
@@ -27,7 +26,6 @@ public class UserMapper {
         }
         return UserResponse.builder()
                 .userId(user.getUserId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())

@@ -27,7 +27,12 @@ public class SecurityConfig {
             "/api/auth/signup",
             "/api/auth/login",
             "/api/auth/introspect",
-            "/api/auth/refresh"
+            "/api/auth/refresh",
+            "/api/auth/verify-email",
+            "/api/auth/resend-otp",
+            "/api/auth/forgot-password",
+            "/api/auth/verify-reset-otp",
+            "/api/auth/reset-password"
     };
 
     private final String[] PUBLIC_SWAGGER_ENDPOINTS = {
