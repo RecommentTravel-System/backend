@@ -45,6 +45,24 @@ public class OverpassApiClient {
         }
     }
 
+    /**
+     * Fetches a single OSM element by raw Overpass QL query.
+     * Used for individual POI lookup by osmId.
+     */
+    public OverpassResponse fetchSingleElement(String query) {
+        try {
+            return callOverpass(primaryUrl, query);
+        } catch (RestClientException primaryEx) {
+            log.warn("Primary Overpass endpoint failed for single element, trying fallback", primaryEx);
+            try {
+                return callOverpass(fallbackUrl, query);
+            } catch (RestClientException fallbackEx) {
+                log.error("Fallback Overpass endpoint also failed for single element", fallbackEx);
+                throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_SERVICE_UNAVAILABLE, fallbackEx);
+            }
+        }
+    }
+
     private OverpassResponse callOverpass(String url, String query) {
         try {
             return overpassRestClient.post()

@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface LocationService {
     List<LocationResponse> searchNearbyLocations(LocationFilterRequest request);
-    LocationResponse getLocationById(Long locationId);
+    LocationResponse getPlaceByOsmId(Long osmId);
 }

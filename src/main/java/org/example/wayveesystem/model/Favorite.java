@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "favorites", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_location_favorite", columnNames = {"user_id", "location_id"})
+        @UniqueConstraint(name = "uk_user_osm_favorite", columnNames = {"user_id", "osm_id"})
 })
 @Getter
 @Setter
@@ -28,9 +28,17 @@ public class Favorite {
     @JoinColumn(name = "user_id", nullable = false)
     User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "location_id", nullable = false)
-    Location location;
+    @Column(name = "osm_id", nullable = false)
+    Long osmId;
+
+    @Column(name = "place_name")
+    String placeName;
+
+    @Column(name = "latitude")
+    Double latitude;
+
+    @Column(name = "longitude")
+    Double longitude;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

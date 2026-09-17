@@ -38,10 +38,11 @@ public class LocationController {
     }
 
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
-    @Operation(summary = "Lấy thông tin chi tiết địa điểm", description = "Lấy chi tiết thông tin địa điểm theo Location ID")
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<LocationResponse>> getLocationById(@PathVariable("id") Long id) {
-        LocationResponse location = locationService.getLocationById(id);
+    @Operation(summary = "Lấy thông tin chi tiết địa điểm theo OSM ID",
+               description = "Lấy chi tiết thông tin địa điểm từ OpenStreetMap theo OSM ID")
+    @GetMapping("/osm/{osmId}")
+    public ResponseEntity<ApiResponse<LocationResponse>> getPlaceByOsmId(@PathVariable("osmId") Long osmId) {
+        LocationResponse location = locationService.getPlaceByOsmId(osmId);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success("Get location details successful", location));
     }

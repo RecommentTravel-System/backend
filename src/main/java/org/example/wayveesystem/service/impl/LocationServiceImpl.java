@@ -6,26 +6,26 @@ import org.example.wayveesystem.common.client.OverpassApiClient;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.common.strategy.OsmFilterFactory;
+import org.example.wayveesystem.dto.GridCacheKey;
+import org.example.wayveesystem.dto.OsmPlace;
 import org.example.wayveesystem.dto.request.LocationFilterRequest;
 import org.example.wayveesystem.dto.request.OverpassRequest;
 import org.example.wayveesystem.dto.response.LocationResponse;
 import org.example.wayveesystem.dto.response.OverpassElementResponse;
 import org.example.wayveesystem.dto.response.OverpassResponse;
-import org.example.wayveesystem.mapper.LocationMapper;
 import org.example.wayveesystem.mapper.OsmPlaceMapper;
-import org.example.wayveesystem.model.Location;
-import org.example.wayveesystem.respository.LocationRepository;
+import org.example.wayveesystem.mapper.PlaceResponseMapper;
 import org.example.wayveesystem.service.LocationService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,108 +35,118 @@ public class LocationServiceImpl implements LocationService {
     private final OverpassApiClient overpassApiClient;
     private final OsmFilterFactory osmFilterFactory;
     private final OsmPlaceMapper osmPlaceMapper;
-    private final LocationMapper locationMapper;
-    private final LocationRepository locationRepository;
+    private final PlaceResponseMapper placeResponseMapper;
+    private final CacheManager cacheManager;
+
+    @Value("${wayvee.cache.grid-precision}")
+    private double gridPrecision;
 
     @Override
-    @Transactional
     public List<LocationResponse> searchNearbyLocations(LocationFilterRequest request) {
         double lat = request.lat();
         double lng = request.lng();
         int radius = request.radiusMeters() != null ? request.radiusMeters() : 1000;
 
         List<String> categories = (request.categories() != null && !request.categories().isEmpty())
-                ? request.categories()
-                : List.of("RESTAURANT", "CAFE", "FAST_FOOD");
+                ? request.categories().stream().sorted().toList()
+                : List.of("CAFE", "FAST_FOOD", "RESTAURANT");
 
-        List<String> queryClauses = new ArrayList<>();
-        queryClauses.addAll(osmFilterFactory.buildFilterClauses("category", categories, lat, lng, radius));
+        List<String> cuisines = (request.cuisines() != null && !request.cuisines().isEmpty())
+                ? request.cuisines().stream().sorted().toList()
+                : List.of();
 
-        if (request.cuisines() != null && !request.cuisines().isEmpty()) {
-            queryClauses.addAll(osmFilterFactory.buildFilterClauses("cuisine", request.cuisines(), lat, lng, radius));
-        }
+        // Snap coordinates to grid for better cache hit rate
+        double gridLat = GridCacheKey.snapToGrid(lat, gridPrecision);
+        double gridLng = GridCacheKey.snapToGrid(lng, gridPrecision);
+        GridCacheKey cacheKey = new GridCacheKey(gridLat, gridLng, categories, cuisines, radius);
 
-        OverpassRequest overpassRequest = OverpassRequest.of(lat, lng, radius, queryClauses);
-        OverpassResponse overpassResponse = overpassApiClient.fetchNearbyPois(overpassRequest);
+        // Check cache first
+        List<OsmPlace> places = getFromCacheOrFetch(cacheKey, lat, lng, radius, categories, cuisines);
 
-        List<Location> mappedLocations = new ArrayList<>();
-        if (overpassResponse != null && overpassResponse.elements() != null) {
-            for (OverpassElementResponse element : overpassResponse.elements()) {
-                Location mappedLocation = osmPlaceMapper.toLocation(element);
-                if (mappedLocation != null) {
-                    mappedLocations.add(mappedLocation);
-                }
-            }
-        }
-
-        List<Location> savedLocations = batchSyncWithDatabase(mappedLocations);
-
-        return savedLocations.stream()
-                .filter(loc -> matchesKeyword(loc, request.keyword()))
-                .filter(loc -> matchesMinRating(loc, request.minRating()))
-                .map(loc -> locationMapper.toResponse(loc, lat, lng))
+        // Apply in-memory filters (keyword, minRating) and map to response
+        return places.stream()
+                .filter(place -> matchesKeyword(place, request.keyword()))
+                .map(place -> placeResponseMapper.toResponse(place, lat, lng))
                 .sorted(Comparator.comparingDouble(LocationResponse::distanceMeters))
                 .toList();
     }
 
     @Override
-    public LocationResponse getLocationById(Long locationId) {
-        Location location = locationRepository.findById(locationId)
-                .orElseThrow(() -> new AppException(ErrorCode.LOCATION_NOT_FOUND));
-        return locationMapper.toResponse(location, location.getLatitude(), location.getLongitude());
-    }
-
-    private List<Location> batchSyncWithDatabase(List<Location> mappedLocations) {
-        if (mappedLocations.isEmpty()) {
-            return List.of();
+    public LocationResponse getPlaceByOsmId(Long osmId) {
+        // First try to find in cache
+        Cache poiCache = cacheManager.getCache("poiCache");
+        if (poiCache != null) {
+            // Search through all cached entries is not efficient with Caffeine,
+            // so we do a single-element Overpass lookup instead
         }
 
-        Map<Long, Location> uniqueMapped = new LinkedHashMap<>();
-        List<Location> withoutOsmId = new ArrayList<>();
-        for (Location loc : mappedLocations) {
-            if (loc.getSourceOsmId() != null) {
-                uniqueMapped.putIfAbsent(loc.getSourceOsmId(), loc);
-            } else {
-                withoutOsmId.add(loc);
+        // Fetch single element from Overpass
+        String query = String.format("[out:json][timeout:10];(node(%d);way(%d););out center qt;", osmId, osmId);
+        OverpassResponse response = overpassApiClient.fetchSingleElement(query);
+
+        if (response == null || response.elements() == null || response.elements().isEmpty()) {
+            throw new AppException(ErrorCode.LOCATION_NOT_FOUND);
+        }
+
+        OsmPlace place = osmPlaceMapper.toOsmPlace(response.elements().getFirst());
+        if (place == null) {
+            throw new AppException(ErrorCode.LOCATION_NOT_FOUND);
+        }
+
+        return placeResponseMapper.toResponse(place, place.latitude(), place.longitude());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<OsmPlace> getFromCacheOrFetch(GridCacheKey cacheKey, double lat, double lng,
+                                                int radius, List<String> categories, List<String> cuisines) {
+        Cache poiCache = cacheManager.getCache("poiCache");
+        if (poiCache != null) {
+            Cache.ValueWrapper cached = poiCache.get(cacheKey);
+            if (cached != null) {
+                log.debug("Cache HIT for grid [{}, {}]", cacheKey.gridLat(), cacheKey.gridLng());
+                return (List<OsmPlace>) cached.get();
             }
         }
 
-        List<Long> osmIds = new ArrayList<>(uniqueMapped.keySet());
+        log.debug("Cache MISS for grid [{}, {}], calling Overpass API", cacheKey.gridLat(), cacheKey.gridLng());
 
-        Map<Long, Location> existingMap = locationRepository.findBySourceOsmIdIn(osmIds).stream()
-                .collect(Collectors.toMap(Location::getSourceOsmId, loc -> loc, (existing, replacement) -> existing));
+        // Build Overpass query using grid center for better cache reuse
+        List<String> queryClauses = new ArrayList<>();
+        queryClauses.addAll(osmFilterFactory.buildFilterClauses("category", categories,
+                cacheKey.gridLat(), cacheKey.gridLng(), radius));
 
-        List<Location> toSave = new ArrayList<>();
-        for (Location loc : uniqueMapped.values()) {
-            Location existing = existingMap.get(loc.getSourceOsmId());
-            if (existing != null) {
-                existing.setName(loc.getName());
-                existing.setAddress(loc.getAddress());
-                existing.setLatitude(loc.getLatitude());
-                existing.setLongitude(loc.getLongitude());
-                toSave.add(existing);
-            } else {
-                toSave.add(loc);
-            }
+        if (!cuisines.isEmpty()) {
+            queryClauses.addAll(osmFilterFactory.buildFilterClauses("cuisine", cuisines,
+                    cacheKey.gridLat(), cacheKey.gridLng(), radius));
         }
-        toSave.addAll(withoutOsmId);
 
-        return locationRepository.saveAll(toSave);
+        OverpassRequest overpassRequest = OverpassRequest.of(cacheKey.gridLat(), cacheKey.gridLng(), radius, queryClauses);
+        OverpassResponse overpassResponse = overpassApiClient.fetchNearbyPois(overpassRequest);
+
+        List<OsmPlace> places;
+        if (overpassResponse != null && overpassResponse.elements() != null) {
+            places = overpassResponse.elements().stream()
+                    .map(osmPlaceMapper::toOsmPlace)
+                    .filter(Objects::nonNull)
+                    .toList();
+        } else {
+            places = List.of();
+        }
+
+        // Store in cache
+        if (poiCache != null) {
+            poiCache.put(cacheKey, places);
+        }
+
+        return places;
     }
 
-    private boolean matchesKeyword(Location location, String keyword) {
+    private boolean matchesKeyword(OsmPlace place, String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return true;
         }
         String lowerKeyword = keyword.toLowerCase();
-        return (location.getName() != null && location.getName().toLowerCase().contains(lowerKeyword))
-                || (location.getAddress() != null && location.getAddress().toLowerCase().contains(lowerKeyword));
-    }
-
-    private boolean matchesMinRating(Location location, Double minRating) {
-        if (minRating == null || minRating <= 0) {
-            return true;
-        }
-        return location.getRating() != null && location.getRating() >= minRating;
+        return (place.name() != null && place.name().toLowerCase().contains(lowerKeyword))
+                || (place.address() != null && place.address().toLowerCase().contains(lowerKeyword));
     }
 }

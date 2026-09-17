@@ -4,15 +4,15 @@ import lombok.Builder;
 
 @Builder
 public record LocationResponse(
-        Long locationId,
-        Long sourceOsmId,
+        Long osmId,
         String name,
         String categoryCode,
         String address,
         Double latitude,
         Double longitude,
         String imageUrl,
-        Double rating,
-        Integer reviewCount,
+        String openingHours,
+        String phone,
+        String website,
         Double distanceMeters
 ) {}

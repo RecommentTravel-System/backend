@@ -26,9 +26,17 @@ public class TripLocation {
     @JoinColumn(name = "trip_id", nullable = false)
     Trip trip;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "location_id", nullable = false)
-    Location location;
+    @Column(name = "osm_id", nullable = false)
+    Long osmId;
+
+    @Column(name = "place_name")
+    String placeName;
+
+    @Column(name = "latitude")
+    Double latitude;
+
+    @Column(name = "longitude")
+    Double longitude;
 
     @Column(name = "visit_order")
     Integer visitOrder;

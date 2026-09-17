@@ -27,9 +27,11 @@ public class Review {
     @JoinColumn(name = "user_id", nullable = false)
     User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "location_id", nullable = false)
-    Location location;
+    @Column(name = "osm_id", nullable = false)
+    Long osmId;
+
+    @Column(name = "place_name")
+    String placeName;
 
     @Column(name = "rating", nullable = false)
     Integer rating;

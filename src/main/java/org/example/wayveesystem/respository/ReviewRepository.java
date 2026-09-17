@@ -1,6 +1,5 @@
 package org.example.wayveesystem.respository;
 
-import org.example.wayveesystem.model.Location;
 import org.example.wayveesystem.model.Review;
 import org.example.wayveesystem.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,11 +11,11 @@ import java.util.List;
 
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
-    List<Review> findByLocation(Location location);
+    List<Review> findByOsmId(Long osmId);
     List<Review> findByUser(User user);
 
-    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.location = :location")
-    Double getAverageRatingByLocation(@Param("location") Location location);
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.osmId = :osmId")
+    Double getAverageRatingByOsmId(@Param("osmId") Long osmId);
 
-    long countByLocation(Location location);
+    long countByOsmId(Long osmId);
 }

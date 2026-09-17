@@ -1,7 +1,8 @@
 package org.example.wayveesystem.mapper;
 
+import org.example.wayveesystem.dto.OsmPlace;
 import org.example.wayveesystem.dto.response.OverpassElementResponse;
-import org.example.wayveesystem.model.Location;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -25,7 +26,14 @@ public class OsmPlaceMapper {
             Map.entry("hostel", "ACCOMMODATION")
     );
 
-    public Location toLocation(OverpassElementResponse el) {
+    @Value("${wayvee.poi.default-image-url}")
+    private String defaultImageUrl;
+
+    /**
+     * Maps an Overpass API element to an in-memory OsmPlace POJO.
+     * Extracts image URLs from OSM tags (image, wikimedia_commons).
+     */
+    public OsmPlace toOsmPlace(OverpassElementResponse el) {
         if (el == null || el.tags() == null) {
             return null;
         }
@@ -35,17 +43,50 @@ public class OsmPlaceMapper {
         String categoryCode = TAG_TO_CATEGORY.getOrDefault(rawTag, "OTHER");
         String name = tags.getOrDefault("name", "Địa điểm OSM #" + el.id());
         String address = extractAddress(tags);
+        String imageUrl = extractImageUrl(tags);
+        String openingHours = tags.get("opening_hours");
+        String phone = tags.getOrDefault("phone", tags.get("contact:phone"));
+        String website = tags.getOrDefault("website", tags.get("contact:website"));
 
-        return Location.builder()
-                .sourceOsmId(el.id())
-                .name(name)
-                .address(address)
-                .latitude(el.getLat())
-                .longitude(el.getLon())
-                .categoryCode(categoryCode)
-                .rating(0.0)
-                .reviewCount(0)
-                .build();
+        return new OsmPlace(
+                el.id(),
+                name,
+                categoryCode,
+                address,
+                el.getLat(),
+                el.getLon(),
+                imageUrl,
+                openingHours,
+                phone,
+                website,
+                tags
+        );
+    }
+
+    /**
+     * Extracts image URL from OSM tags.
+     * Priority: image tag > wikimedia_commons tag > default image.
+     */
+    private String extractImageUrl(Map<String, String> tags) {
+        // Direct image URL from OSM
+        String imageTag = tags.get("image");
+        if (imageTag != null && !imageTag.isBlank()) {
+            return imageTag;
+        }
+
+        // Wikimedia Commons: build thumbnail URL
+        String wikimediaCommons = tags.get("wikimedia_commons");
+        if (wikimediaCommons != null && !wikimediaCommons.isBlank()) {
+            // Format: "File:Example.jpg" → thumbnail URL
+            String fileName = wikimediaCommons.startsWith("File:")
+                    ? wikimediaCommons.substring(5)
+                    : wikimediaCommons;
+            return "https://commons.wikimedia.org/wiki/Special:FilePath/"
+                    + fileName.replace(" ", "_") + "?width=400";
+        }
+
+        // Wikidata: could resolve but would require extra API call, use default instead
+        return defaultImageUrl;
     }
 
     private String firstMatchingTag(Map<String, String> tags) {
