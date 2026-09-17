@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
@@ -18,8 +19,8 @@ import org.example.wayveesystem.dto.response.AuthenticationResponse;
 import org.example.wayveesystem.dto.response.IntrospectResponse;
 import org.example.wayveesystem.dto.response.ResetOtpResponse;
 import org.example.wayveesystem.dto.response.UserResponse;
-import org.example.wayveesystem.entity.InvalidatedToken;
-import org.example.wayveesystem.entity.User;
+import org.example.wayveesystem.model.InvalidatedToken;
+import org.example.wayveesystem.model.User;
 import org.example.wayveesystem.mapper.UserMapper;
 import org.example.wayveesystem.respository.InvalidatedTokenRepository;
 import org.example.wayveesystem.respository.UserRepository;
@@ -79,6 +80,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         validateUserCreation(request);
         User user = userMapper.toUser(request);
         user.setStatus(UserStatus.PENDING);
+        user.setRole(Role.USER);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         User savedUser = userRepository.save(user);
 
@@ -90,7 +92,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        var user = userRepository.findByEmail(request.getEmail(), request.getEmail())
+        var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         validateUserStatus(user);
@@ -283,7 +285,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         Instant.now().plus(60, ChronoUnit.MINUTES).toEpochMilli()
                 ))
                 .jwtID(UUID.randomUUID().toString())
-                .claim("scope", "ROLE_USER")
+                .claim("scope", user.getRole() != null ? "ROLE_" + user.getRole().name() : "ROLE_USER")
                 .build();
 
         Payload payload = new Payload(claims.toJSONObject());

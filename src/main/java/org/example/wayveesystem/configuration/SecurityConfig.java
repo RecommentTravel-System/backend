@@ -48,6 +48,7 @@ public class SecurityConfig {
         httpSecurity.authorizeHttpRequests(auth ->
                 auth.requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
                         .requestMatchers(PUBLIC_SWAGGER_ENDPOINTS).permitAll()
+                        .requestMatchers("/api/v1/locations/**").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN")
                         .anyRequest().authenticated());
 
         httpSecurity.oauth2ResourceServer(oauth2 ->

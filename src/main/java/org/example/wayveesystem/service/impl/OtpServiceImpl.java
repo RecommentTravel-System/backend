@@ -6,7 +6,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
-import org.example.wayveesystem.entity.OtpEmail;
+import org.example.wayveesystem.model.OtpEmail;
 import org.example.wayveesystem.respository.OtpRepository;
 import org.example.wayveesystem.service.OtpService;
 import org.springframework.beans.factory.annotation.Value;

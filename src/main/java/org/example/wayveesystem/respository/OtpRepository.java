@@ -1,6 +1,6 @@
 package org.example.wayveesystem.respository;
 
-import org.example.wayveesystem.entity.OtpEmail;
+import org.example.wayveesystem.model.OtpEmail;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

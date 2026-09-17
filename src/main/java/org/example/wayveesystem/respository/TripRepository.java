@@ -1,13 +1,13 @@
 package org.example.wayveesystem.respository;
 
+import org.example.wayveesystem.model.Trip;
 import org.example.wayveesystem.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
+import java.util.List;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByEmail(String email);
-    boolean existsByEmail(String email);
+public interface TripRepository extends JpaRepository<Trip, Long> {
+    List<Trip> findByUser(User user);
 }

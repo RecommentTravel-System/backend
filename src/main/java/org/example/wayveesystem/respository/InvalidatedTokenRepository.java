@@ -1,6 +1,6 @@
 package org.example.wayveesystem.respository;
 
-import org.example.wayveesystem.entity.InvalidatedToken;
+import org.example.wayveesystem.model.InvalidatedToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

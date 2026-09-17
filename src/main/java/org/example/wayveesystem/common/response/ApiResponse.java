@@ -1,5 +1,6 @@
 package org.example.wayveesystem.common.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -17,6 +18,8 @@ public class ApiResponse <T>{
     String message;
     boolean success;
     T data;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime timestamp;
 
     public static <T> ApiResponse<T> success(T data){

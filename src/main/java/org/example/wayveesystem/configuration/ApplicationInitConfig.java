@@ -6,7 +6,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
-import org.example.wayveesystem.entity.User;
+import org.example.wayveesystem.model.User;
 import org.example.wayveesystem.respository.UserRepository;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;

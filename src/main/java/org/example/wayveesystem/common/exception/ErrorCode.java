@@ -37,6 +37,10 @@ public enum ErrorCode {
     PASSWORD_CONFIRM_NOT_MATCH(3010, "Password confirmation does not match", HttpStatus.BAD_REQUEST),
     PASSWORD_SAME_AS_OLD(3011, "New password must be different from old password", HttpStatus.BAD_REQUEST),
     PASSWORD_REQUIRED(3012, "Password is required", HttpStatus.BAD_REQUEST),
+
+    EXTERNAL_MAP_SERVICE_UNAVAILABLE(4001, "External map service is unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    EXTERNAL_MAP_TIMEOUT(4002, "External map service timeout", HttpStatus.GATEWAY_TIMEOUT),
+    LOCATION_NOT_FOUND(4003, "Location not found", HttpStatus.NOT_FOUND),
     ;
     int code;
     String message;

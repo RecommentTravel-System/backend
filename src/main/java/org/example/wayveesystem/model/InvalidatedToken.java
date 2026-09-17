@@ -1,8 +1,7 @@
-package org.example.wayveesystem.entity;
+package org.example.wayveesystem.model;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
