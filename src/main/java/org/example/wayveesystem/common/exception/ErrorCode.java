@@ -41,6 +41,14 @@ public enum ErrorCode {
     EXTERNAL_MAP_SERVICE_UNAVAILABLE(4001, "External map service is unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     EXTERNAL_MAP_TIMEOUT(4002, "External map service timeout", HttpStatus.GATEWAY_TIMEOUT),
     LOCATION_NOT_FOUND(4003, "Location not found", HttpStatus.NOT_FOUND),
+
+    CATEGORY_NOT_FOUND(4004, "Category not found", HttpStatus.NOT_FOUND),
+    CATEGORY_CODE_EXISTED(4005, "Category code already exists", HttpStatus.BAD_REQUEST),
+    FAVORITE_NOT_FOUND(4006, "Favorite item not found", HttpStatus.NOT_FOUND),
+    FAVORITE_ALREADY_EXISTS(4007, "Location is already favorited", HttpStatus.BAD_REQUEST),
+    REVIEW_NOT_FOUND(4008, "Review not found", HttpStatus.NOT_FOUND),
+    SUBSCRIPTION_NOT_FOUND(4009, "Subscription not found", HttpStatus.NOT_FOUND),
+    UNAUTHORIZED_ACTION(4010, "You do not have permission to perform this action", HttpStatus.FORBIDDEN),
     ;
     int code;
     String message;

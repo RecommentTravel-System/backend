@@ -18,4 +18,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Double getAverageRatingByOsmId(@Param("osmId") Long osmId);
 
     long countByOsmId(Long osmId);
+
+    List<Review> findByOsmIdAndRatingGreaterThanEqual(Long osmId, Integer minRating);
+    List<Review> findByUserAndPlaceNameContainingIgnoreCase(User user, String placeName);
 }
