@@ -13,19 +13,20 @@ public class OsmFilterFactory {
     private final List<OsmFilterStrategy> strategies;
 
     public List<String> buildFilterClauses(String filterKey, List<String> filterValues, double lat, double lng, int radiusMeters) {
-        List<String> clauses = new ArrayList<>();
+        if (filterValues == null || filterValues.isEmpty()) {
+            return List.of();
+        }
 
         OsmFilterStrategy targetStrategy = strategies.stream()
                 .filter(s -> s.supports(filterKey))
                 .findFirst()
                 .orElse(null);
 
-        if (targetStrategy != null && filterValues != null) {
-            for (String val : filterValues) {
-                clauses.addAll(targetStrategy.buildQueryClauses(val, lat, lng, radiusMeters));
-            }
+        if (targetStrategy != null) {
+            return targetStrategy.buildGroupedQueryClauses(filterValues, lat, lng, radiusMeters);
         }
 
-        return clauses;
+        return List.of();
     }
 }
+

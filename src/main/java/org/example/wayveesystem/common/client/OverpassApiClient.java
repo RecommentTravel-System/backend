@@ -1,6 +1,7 @@
 package org.example.wayveesystem.common.client;
 
-import lombok.RequiredArgsConstructor;
+import com.google.common.util.concurrent.RateLimiter;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.common.exception.ExternalMapServiceException;
@@ -9,6 +10,7 @@ import org.example.wayveesystem.dto.response.OverpassResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -18,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class OverpassApiClient {
 
@@ -30,19 +31,30 @@ public class OverpassApiClient {
     @Value("${overpass.api.fallback-url}")
     private String fallbackUrl;
 
+    @Value("${overpass.rate-limit.requests-per-second:1.0}")
+    private double requestsPerSecond;
+
+    @Value("${overpass.retry.max-attempts:3}")
+    private int maxAttempts;
+
+    @Value("${overpass.retry.initial-backoff-ms:1000}")
+    private long initialBackoffMs;
+
+    private RateLimiter rateLimiter;
+
+    public OverpassApiClient(RestClient overpassRestClient) {
+        this.overpassRestClient = overpassRestClient;
+    }
+
+    @PostConstruct
+    public void init() {
+        this.rateLimiter = RateLimiter.create(requestsPerSecond);
+        log.info("Initialized OverpassApiClient RateLimiter with rate limit: {} req/sec", requestsPerSecond);
+    }
+
     public OverpassResponse fetchNearbyPois(OverpassRequest request) {
         String query = buildQuery(request);
-        try {
-            return callOverpass(primaryUrl, query);
-        } catch (RestClientException primaryEx) {
-            log.warn("Primary Overpass endpoint failed, trying fallback", primaryEx);
-            try {
-                return callOverpass(fallbackUrl, query);
-            } catch (RestClientException fallbackEx) {
-                log.error("Fallback Overpass endpoint also failed", fallbackEx);
-                throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_SERVICE_UNAVAILABLE, fallbackEx);
-            }
-        }
+        return executeWithRetryAndFallback(query);
     }
 
     /**
@@ -50,29 +62,71 @@ public class OverpassApiClient {
      * Used for individual POI lookup by osmId.
      */
     public OverpassResponse fetchSingleElement(String query) {
+        return executeWithRetryAndFallback(query);
+    }
+
+    private OverpassResponse executeWithRetryAndFallback(String query) {
         try {
-            return callOverpass(primaryUrl, query);
-        } catch (RestClientException primaryEx) {
-            log.warn("Primary Overpass endpoint failed for single element, trying fallback", primaryEx);
+            return executeWithRetry(primaryUrl, query);
+        } catch (Exception primaryEx) {
+            log.warn("Primary Overpass endpoint [{}] failed or exhausted retries: {}. Trying fallback endpoint [{}]...",
+                    primaryUrl, primaryEx.getMessage(), fallbackUrl);
             try {
-                return callOverpass(fallbackUrl, query);
-            } catch (RestClientException fallbackEx) {
-                log.error("Fallback Overpass endpoint also failed for single element", fallbackEx);
+                return executeWithRetry(fallbackUrl, query);
+            } catch (Exception fallbackEx) {
+                log.error("Fallback Overpass endpoint [{}] also failed: {}", fallbackUrl, fallbackEx.getMessage(), fallbackEx);
                 throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_SERVICE_UNAVAILABLE, fallbackEx);
             }
         }
     }
 
+    private OverpassResponse executeWithRetry(String url, String query) {
+        long backoffMs = initialBackoffMs;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            rateLimiter.acquire();
+            try {
+                return callOverpass(url, query);
+            } catch (HttpClientErrorException.TooManyRequests ex) {
+                log.warn("Overpass API [{}] returned 429 Too Many Requests (attempt {}/{}). Retrying in {}ms...",
+                        url, attempt, maxAttempts, backoffMs);
+                if (attempt == maxAttempts) {
+                    throw ex;
+                }
+                sleep(backoffMs);
+                backoffMs *= 2;
+            } catch (ResourceAccessException timeoutEx) {
+                log.warn("Overpass API [{}] timeout on attempt {}/{}: {}",
+                        url, attempt, maxAttempts, timeoutEx.getMessage());
+                if (attempt == maxAttempts) {
+                    throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_TIMEOUT, timeoutEx);
+                }
+                sleep(backoffMs);
+                backoffMs *= 2;
+            } catch (RestClientException otherEx) {
+                log.warn("Overpass API [{}] failed with client error on attempt {}/{}: {}",
+                        url, attempt, maxAttempts, otherEx.getMessage());
+                throw otherEx;
+            }
+        }
+        throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_SERVICE_UNAVAILABLE);
+    }
+
     private OverpassResponse callOverpass(String url, String query) {
+        return overpassRestClient.post()
+                .uri(url)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body("data=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
+                .retrieve()
+                .body(OverpassResponse.class);
+    }
+
+    private void sleep(long millis) {
         try {
-            return overpassRestClient.post()
-                    .uri(url)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body("data=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
-                    .retrieve()
-                    .body(OverpassResponse.class);
-        } catch (ResourceAccessException timeoutEx) {
-            throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_TIMEOUT, timeoutEx);
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Retry backoff interrupted", e);
         }
     }
 
@@ -85,6 +139,6 @@ public class OverpassApiClient {
                     return String.format(java.util.Locale.US, "node[\"%s\"](around:%d,%.6f,%.6f);", f, request.radiusMeters(), request.lat(), request.lng());
                 })
                 .collect(Collectors.joining());
-        return "[out:json][timeout:30];(%s);out center qt;".formatted(filterClauses);
+        return "[out:json][timeout:30];(%s);out center qt 1000;".formatted(filterClauses);
     }
-}
+}

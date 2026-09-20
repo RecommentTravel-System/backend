@@ -24,7 +24,7 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager("poiCache");
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager("poiCache", "reverseGeocodeCache");
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(poiMaxSize)
                 .expireAfterWrite(poiTtlMinutes, TimeUnit.MINUTES)

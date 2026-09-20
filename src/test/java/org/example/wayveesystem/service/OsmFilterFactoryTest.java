@@ -46,21 +46,25 @@ class OsmFilterFactoryTest {
     }
 
     @Test
-    void buildFilterClauses_Cuisine_ShouldBuildCuisineClauses() {
+    void buildFilterClauses_AllEightCategories_ShouldProduceGroupedRegexClauses() {
         double lat = 10.7769;
         double lng = 106.7009;
         int radius = 1000;
 
-        List<String> clauses = osmFilterFactory.buildFilterClauses(
-                "cuisine",
-                List.of("vietnamese"),
-                lat,
-                lng,
-                radius
+        List<String> categories = List.of(
+                "RESTAURANT", "CAFE", "FAST_FOOD", "BAR", "BAKERY", "SHOPPING", "ATTRACTION", "ACCOMMODATION"
         );
+
+        List<String> clauses = osmFilterFactory.buildFilterClauses("category", categories, lat, lng, radius);
 
         Assertions.assertNotNull(clauses);
         Assertions.assertFalse(clauses.isEmpty());
-        Assertions.assertTrue(clauses.get(0).contains("cuisine\"=\"vietnamese"));
+        // 5 tag keys (amenity, shop, tourism, leisure, craft) * 2 (node + way) = 10 clauses max
+        Assertions.assertTrue(clauses.size() <= 10, "Clauses count should be minimized by regex grouping (<= 10 clauses)");
+
+        // Verify amenity regex group
+        boolean hasAmenityRegex = clauses.stream().anyMatch(c -> c.contains("node[\"amenity\"~\"^("));
+        Assertions.assertTrue(hasAmenityRegex, "Should contain grouped regex for amenity tag key");
     }
 }
+

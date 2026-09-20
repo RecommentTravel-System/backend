@@ -1,19 +1,21 @@
 package org.example.wayveesystem.dto;
 
 import java.io.Serializable;
-import java.util.List;
 
 /**
  * Cache key for grid-based POI lookups.
- * Coordinates are snapped to a grid to increase cache hit rate.
+ * Coordinates are snapped to a grid, independent of categories, cuisines, or user filters.
+ * Caches all POIs within a fixed maximum radius (e.g., 10,000 meters / 10km).
  */
 public record GridCacheKey(
         double gridLat,
         double gridLng,
-        List<String> categories,
-        List<String> cuisines,
-        int radiusMeters
+        int maxRadiusMeters
 ) implements Serializable {
+
+    public GridCacheKey(double gridLat, double gridLng) {
+        this(gridLat, gridLng, 3000); // Reduced to 3km max grid radius to avoid Overpass timeouts
+    }
 
     /**
      * Snaps a coordinate to the nearest grid point based on the given precision.
@@ -23,3 +25,4 @@ public record GridCacheKey(
         return Math.round(coordinate / precision) * precision;
     }
 }
+

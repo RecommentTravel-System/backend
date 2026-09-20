@@ -49,6 +49,13 @@ public enum ErrorCode {
     REVIEW_NOT_FOUND(4008, "Review not found", HttpStatus.NOT_FOUND),
     SUBSCRIPTION_NOT_FOUND(4009, "Subscription not found", HttpStatus.NOT_FOUND),
     UNAUTHORIZED_ACTION(4010, "You do not have permission to perform this action", HttpStatus.FORBIDDEN),
+
+    TRIP_NAME_REQUIRED(5001, "Tên chuyến đi không được để trống", HttpStatus.BAD_REQUEST),
+    TRIP_DATES_REQUIRED(5002, "Ngày đi - về không được để trống", HttpStatus.BAD_REQUEST),
+    DESTINATION_REQUIRED(5003, "Điểm đến không được để trống", HttpStatus.BAD_REQUEST),
+    COMPANIONS_REQUIRED(5004, "Thông tin người đi cùng không được để trống", HttpStatus.BAD_REQUEST),
+    PASSENGER_COUNT_REQUIRED(5005, "Số lượng người không được để trống", HttpStatus.BAD_REQUEST),
+    TRAVEL_STYLE_REQUIRED(5006, "Phong cách chuyến đi không được để trống", HttpStatus.BAD_REQUEST),
     ;
     int code;
     String message;
