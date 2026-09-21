@@ -15,7 +15,9 @@ public record LocationFilterRequest(
         List<String> categories,
         List<String> cuisines,
         String keyword,
-        Double minRating
+        Double minRating,
+        Integer page,
+        Integer size
 ) {
     public LocationFilterRequest {
         if (radiusMeters == null || radiusMeters <= 0) {
@@ -23,5 +25,7 @@ public record LocationFilterRequest(
         } else if (radiusMeters > 10000) {
             radiusMeters = 10000;
         }
+        page = page == null || page < 0 ? 0 : page;
+        size = size == null || size < 1 ? 6 : Math.min(size, 10);
     }
 }

@@ -41,6 +41,10 @@ public enum ErrorCode {
     EXTERNAL_MAP_SERVICE_UNAVAILABLE(4001, "External map service is unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     EXTERNAL_MAP_TIMEOUT(4002, "External map service timeout", HttpStatus.GATEWAY_TIMEOUT),
     LOCATION_NOT_FOUND(4003, "Location not found", HttpStatus.NOT_FOUND),
+    IMAGE_REQUIRED(4011, "Image file is required", HttpStatus.BAD_REQUEST),
+    INVALID_IMAGE_TYPE(4012, "Only image files are supported", HttpStatus.BAD_REQUEST),
+    IMAGE_TOO_LARGE(4013, "Image size must not exceed 10 MB", HttpStatus.PAYLOAD_TOO_LARGE),
+    IMAGE_UPLOAD_FAILED(4014, "Failed to upload image", HttpStatus.INTERNAL_SERVER_ERROR),
 
     CATEGORY_NOT_FOUND(4004, "Category not found", HttpStatus.NOT_FOUND),
     CATEGORY_CODE_EXISTED(4005, "Category code already exists", HttpStatus.BAD_REQUEST),

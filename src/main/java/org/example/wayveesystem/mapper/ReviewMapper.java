@@ -20,6 +20,7 @@ public class ReviewMapper {
                 .placeName(request.getPlaceName())
                 .rating(request.getRating())
                 .comment(request.getComment())
+                .anonymous(request.getAnonymous() != null ? request.getAnonymous() : false)
                 .build();
     }
 
@@ -27,16 +28,18 @@ public class ReviewMapper {
         if (review == null) {
             return null;
         }
+        boolean isAnonymous = Boolean.TRUE.equals(review.getAnonymous());
         return ReviewResponse.builder()
                 .reviewId(review.getReviewId())
-                .userId(review.getUser() != null ? review.getUser().getUserId() : null)
-                .userFullName(review.getUser() != null ? review.getUser().getFullName() : null)
+                .userId(isAnonymous ? null : (review.getUser() != null ? review.getUser().getUserId() : null))
+                .userFullName(isAnonymous ? "Ẩn danh" : (review.getUser() != null ? review.getUser().getFullName() : null))
                 .osmId(review.getOsmId())
                 .placeName(review.getPlaceName())
                 .rating(review.getRating())
                 .comment(review.getComment())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
+                .anonymous(isAnonymous)
                 .build();
     }
 
@@ -46,5 +49,8 @@ public class ReviewMapper {
         }
         review.setRating(request.getRating());
         review.setComment(request.getComment());
+        if (request.getAnonymous() != null) {
+            review.setAnonymous(request.getAnonymous());
+        }
     }
 }

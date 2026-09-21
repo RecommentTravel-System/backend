@@ -9,14 +9,16 @@ import lombok.experimental.FieldDefaults;
 import org.example.wayveesystem.common.response.ApiResponse;
 import org.example.wayveesystem.dto.request.LocationFilterRequest;
 import org.example.wayveesystem.dto.response.LocationResponse;
+import org.example.wayveesystem.dto.response.LocationPageResponse;
 import org.example.wayveesystem.dto.response.NominatimReverseResponse;
+import org.example.wayveesystem.dto.response.ImageUploadResponse;
+import org.example.wayveesystem.service.CloudinaryImageService;
 import org.example.wayveesystem.service.LocationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Location API", description = "Endpoints tìm kiếm hàng quán, nhà hàng, quán café gần vị trí người dùng qua OpenStreetMap & Overpass API")
 @RestController
@@ -25,13 +27,24 @@ import java.util.List;
 public class LocationController {
 
     LocationService locationService;
+    CloudinaryImageService cloudinaryImageService;
+
+    @Operation(summary = "Upload ảnh địa điểm lên Cloudinary")
+        @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PostMapping("/api/v1/locations/images")
+    public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadLocationImage(
+            @RequestParam("file") MultipartFile file) {
+        ImageUploadResponse image = cloudinaryImageService.uploadLocationImage(file);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("Location image uploaded successfully", image));
+    }
 
     @Operation(summary = "Tìm địa điểm xung quanh (Hàng quán, Quán ăn, Quán cafe, ...)",
                description = "Tìm kiếm các địa điểm xung quanh vị trí tọa độ của User với bộ lọc loại hình mở rộng")
     @PostMapping("/api/v1/locations/nearby")
-    public ResponseEntity<ApiResponse<List<LocationResponse>>> searchNearby(
+    public ResponseEntity<ApiResponse<LocationPageResponse>> searchNearby(
             @Valid @RequestBody LocationFilterRequest request) {
-        List<LocationResponse> locations = locationService.searchNearbyLocations(request);
+        LocationPageResponse locations = locationService.searchNearbyLocations(request);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success("Search nearby locations successful", locations));
     }

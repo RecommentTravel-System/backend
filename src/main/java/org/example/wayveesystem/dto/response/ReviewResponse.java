@@ -21,4 +21,5 @@ public class ReviewResponse {
     String comment;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    Boolean anonymous;
 }

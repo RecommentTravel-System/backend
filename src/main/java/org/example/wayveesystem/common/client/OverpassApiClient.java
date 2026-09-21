@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 @Component
@@ -34,6 +35,10 @@ public class OverpassApiClient {
     @Value("${overpass.rate-limit.requests-per-second:1.0}")
     private double requestsPerSecond;
 
+    // MỚI: giới hạn số connection Overpass mở đồng thời (không liên quan tới size của overpassExecutor)
+    @Value("${overpass.concurrency.max-parallel-requests:2}")
+    private int maxParallelRequests;
+
     @Value("${overpass.retry.max-attempts:3}")
     private int maxAttempts;
 
@@ -42,6 +47,8 @@ public class OverpassApiClient {
 
     private RateLimiter rateLimiter;
 
+    private Semaphore concurrencyLimiter;// MỚI
+
     public OverpassApiClient(RestClient overpassRestClient) {
         this.overpassRestClient = overpassRestClient;
     }
@@ -49,8 +56,12 @@ public class OverpassApiClient {
     @PostConstruct
     public void init() {
         this.rateLimiter = RateLimiter.create(requestsPerSecond);
-        log.info("Initialized OverpassApiClient RateLimiter with rate limit: {} req/sec", requestsPerSecond);
+        this.concurrencyLimiter = new Semaphore(maxParallelRequests, true); // fair=true để tránh starvation
+        log.info("Initialized OverpassApiClient: rate={} req/sec, maxParallel={}",
+                requestsPerSecond, maxParallelRequests);
     }
+
+
 
     public OverpassResponse fetchNearbyPois(OverpassRequest request) {
         String query = buildQuery(request);
@@ -113,12 +124,22 @@ public class OverpassApiClient {
     }
 
     private OverpassResponse callOverpass(String url, String query) {
-        return overpassRestClient.post()
-                .uri(url)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body("data=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
-                .retrieve()
-                .body(OverpassResponse.class);
+        try {
+            concurrencyLimiter.acquire(); // chờ tới khi có slot trống (tối đa 2 request chạy song song)
+            try {
+                return overpassRestClient.post()
+                        .uri(url)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("data=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
+                        .retrieve()
+                        .body(OverpassResponse.class);
+            } finally {
+                concurrencyLimiter.release(); // LUÔN trả slot lại, kể cả khi lỗi
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_SERVICE_UNAVAILABLE, e);
+        }
     }
 
     private void sleep(long millis) {
@@ -141,4 +162,4 @@ public class OverpassApiClient {
                 .collect(Collectors.joining());
         return "[out:json][timeout:30];(%s);out center qt 1000;".formatted(filterClauses);
     }
-}
+}

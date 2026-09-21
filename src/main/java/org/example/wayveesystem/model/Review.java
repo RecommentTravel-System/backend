@@ -39,6 +39,10 @@ public class Review {
     @Column(name = "comment", columnDefinition = "TEXT")
     String comment;
 
+    @Column(name = "anonymous")
+    @Builder.Default
+    Boolean anonymous = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;

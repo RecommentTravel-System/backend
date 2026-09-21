@@ -19,4 +19,6 @@ public class ReviewUpdateRequest {
     Integer rating;
 
     String comment;
+
+    Boolean anonymous;
 }

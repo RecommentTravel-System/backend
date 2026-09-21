@@ -24,4 +24,6 @@ public class ReviewRequest {
     Integer rating;
 
     String comment;
+
+    Boolean anonymous;
 }
