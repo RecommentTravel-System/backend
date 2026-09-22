@@ -2,6 +2,7 @@ package org.example.wayveesystem.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 
 import java.time.LocalDateTime;
@@ -19,4 +20,5 @@ public class UserResponse {
     String phone;
     LocalDateTime createdAt;
     UserStatus status;
+    Role role;
 }
