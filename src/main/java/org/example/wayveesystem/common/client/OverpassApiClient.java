@@ -8,12 +8,10 @@ import org.example.wayveesystem.common.exception.ExternalMapServiceException;
 import org.example.wayveesystem.dto.request.OverpassRequest;
 import org.example.wayveesystem.dto.response.OverpassResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -99,15 +97,21 @@ public class OverpassApiClient {
             try {
                 return callOverpass(url, query);
             } catch (HttpClientErrorException.TooManyRequests ex) {
-                log.warn("Overpass API [{}] returned 429 Too Many Requests (attempt {}/{}). Retrying in {}ms...",
+                log.warn("Overpass API [{}] returned 429 (attempt {}/{}). Retrying in {}ms...",
                         url, attempt, maxAttempts, backoffMs);
+                if (attempt == maxAttempts) throw ex;
+                sleep(backoffMs);
+                backoffMs *= 2;
+            } catch (HttpServerErrorException serverEx) {
+                log.warn("Overpass API [{}] server error {} (attempt {}/{}): server quá tải. Retrying in {}ms...",
+                        url, serverEx.getStatusCode(), attempt, maxAttempts, backoffMs);
                 if (attempt == maxAttempts) {
-                    throw ex;
+                    throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_SERVICE_UNAVAILABLE, serverEx);
                 }
                 sleep(backoffMs);
                 backoffMs *= 2;
             } catch (ResourceAccessException timeoutEx) {
-                log.warn("Overpass API [{}] timeout on attempt {}/{}: {}",
+                log.warn("Overpass API [{}] timeout (connect) attempt {}/{}: {}",
                         url, attempt, maxAttempts, timeoutEx.getMessage());
                 if (attempt == maxAttempts) {
                     throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_TIMEOUT, timeoutEx);
@@ -115,7 +119,21 @@ public class OverpassApiClient {
                 sleep(backoffMs);
                 backoffMs *= 2;
             } catch (RestClientException otherEx) {
-                log.warn("Overpass API [{}] failed with client error on attempt {}/{}: {}",
+                Throwable rootCause = NestedExceptionUtils.getRootCause(otherEx);
+                boolean isTimeoutLike = rootCause instanceof java.net.SocketTimeoutException
+                        || rootCause instanceof java.io.IOException;
+
+                if (isTimeoutLike) {
+                    log.warn("Overpass API [{}] timeout giữa chừng (attempt {}/{}): {}",
+                            url, attempt, maxAttempts, otherEx.getMessage());
+                    if (attempt == maxAttempts) {
+                        throw new ExternalMapServiceException(ErrorCode.EXTERNAL_MAP_TIMEOUT, otherEx);
+                    }
+                    sleep(backoffMs);
+                    backoffMs *= 2;
+                    continue;
+                }
+                log.warn("Overpass API [{}] lỗi không retry được (attempt {}/{}): {}",
                         url, attempt, maxAttempts, otherEx.getMessage());
                 throw otherEx;
             }
@@ -154,12 +172,12 @@ public class OverpassApiClient {
     private String buildQuery(OverpassRequest request) {
         String filterClauses = request.osmFilters().stream()
                 .map(f -> {
-                    if (f.startsWith("node[") || f.startsWith("way[")) {
+                    if (f.startsWith("node[") || f.startsWith("way[") || f.startsWith("relation[")) {
                         return f;
                     }
                     return String.format(java.util.Locale.US, "node[\"%s\"](around:%d,%.6f,%.6f);", f, request.radiusMeters(), request.lat(), request.lng());
                 })
                 .collect(Collectors.joining());
-        return "[out:json][timeout:30];(%s);out center qt 1000;".formatted(filterClauses);
+        return "[out:json][timeout:30];(%s);out center tags qt 1000;".formatted(filterClauses);
     }
 }

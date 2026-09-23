@@ -1,4 +1,4 @@
-package org.example.wayveesystem.respository;
+package org.example.wayveesystem.repository;
 
 import org.example.wayveesystem.model.InvalidatedToken;
 import org.springframework.data.jpa.repository.JpaRepository;

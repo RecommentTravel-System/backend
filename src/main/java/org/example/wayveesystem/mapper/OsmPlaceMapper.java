@@ -1,8 +1,8 @@
 package org.example.wayveesystem.mapper;
 
+import org.example.wayveesystem.common.enums.ImageSource;
 import org.example.wayveesystem.dto.OsmPlace;
 import org.example.wayveesystem.dto.response.OverpassElementResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -26,12 +26,9 @@ public class OsmPlaceMapper {
             Map.entry("hostel", "ACCOMMODATION")
     );
 
-    @Value("${wayvee.poi.default-image-url}")
-    private String defaultImageUrl;
-
     /**
      * Maps an Overpass API element to an in-memory OsmPlace POJO.
-     * Extracts image URLs from OSM tags (image, wikimedia_commons).
+     * Extracts a direct image URL from the OSM image tag when present.
      */
     public OsmPlace toOsmPlace(OverpassElementResponse el) {
         if (el == null || el.tags() == null) {
@@ -43,7 +40,8 @@ public class OsmPlaceMapper {
         String categoryCode = TAG_TO_CATEGORY.getOrDefault(rawTag, "OTHER");
         String name = tags.getOrDefault("name", "Địa điểm OSM #" + el.id());
         String address = extractAddress(tags);
-        String imageUrl = extractImageUrl(tags);
+        String imageUrl = validImageUrl(tags.get("image"));
+        ImageSource imageSource = imageUrl == null ? null : ImageSource.OSM;
         String openingHours = tags.get("opening_hours");
         String phone = tags.getOrDefault("phone", tags.get("contact:phone"));
         String website = tags.getOrDefault("website", tags.get("contact:website"));
@@ -56,6 +54,7 @@ public class OsmPlaceMapper {
                 el.getLat(),
                 el.getLon(),
                 imageUrl,
+                imageSource,
                 openingHours,
                 phone,
                 website,
@@ -63,30 +62,15 @@ public class OsmPlaceMapper {
         );
     }
 
-    /**
-     * Extracts image URL from OSM tags.
-     * Priority: image tag > wikimedia_commons tag > default image.
-     */
-    private String extractImageUrl(Map<String, String> tags) {
-        // Direct image URL from OSM
-        String imageTag = tags.get("image");
-        if (imageTag != null && !imageTag.isBlank()) {
-            return imageTag;
+    private String validImageUrl(String candidate) {
+        if (candidate == null || candidate.isBlank()) return null;
+        try {
+            java.net.URI uri = java.net.URI.create(candidate.trim());
+            return ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+                    && uri.getHost() != null ? uri.toString() : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
-
-        // Wikimedia Commons: build thumbnail URL
-        String wikimediaCommons = tags.get("wikimedia_commons");
-        if (wikimediaCommons != null && !wikimediaCommons.isBlank()) {
-            // Format: "File:Example.jpg" → thumbnail URL
-            String fileName = wikimediaCommons.startsWith("File:")
-                    ? wikimediaCommons.substring(5)
-                    : wikimediaCommons;
-            return "https://commons.wikimedia.org/wiki/Special:FilePath/"
-                    + fileName.replace(" ", "_") + "?width=400";
-        }
-
-        // Wikidata: could resolve but would require extra API call, use default instead
-        return defaultImageUrl;
     }
 
     private String firstMatchingTag(Map<String, String> tags) {

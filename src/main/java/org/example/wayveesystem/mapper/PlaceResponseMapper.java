@@ -27,6 +27,7 @@ public class PlaceResponseMapper {
                 .latitude(place.latitude())
                 .longitude(place.longitude())
                 .imageUrl(place.imageUrl())
+                .imageSource(place.imageSource() == null ? null : place.imageSource().name())
                 .openingHours(place.openingHours())
                 .phone(place.phone())
                 .website(place.website())
@@ -53,6 +54,7 @@ public class PlaceResponseMapper {
                 .latitude(saved.getLatitude())
                 .longitude(saved.getLongitude())
                 .imageUrl(saved.getImageUrl())
+                .imageSource(saved.getImageSource())
                 .distanceMeters(Math.round(distance * 100.0) / 100.0)
                 .build();
     }

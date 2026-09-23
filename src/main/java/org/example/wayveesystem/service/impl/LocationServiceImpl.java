@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.wayveesystem.common.client.OverpassApiClient;
+import org.example.wayveesystem.common.enums.ImageSource;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.GridCacheKey;
@@ -12,6 +13,8 @@ import org.example.wayveesystem.dto.request.LocationFilterRequest;
 import org.example.wayveesystem.dto.response.*;
 import org.example.wayveesystem.mapper.OsmPlaceMapper;
 import org.example.wayveesystem.mapper.PlaceResponseMapper;
+import org.example.wayveesystem.repository.SavedPlaceRepository;
+import org.example.wayveesystem.service.ImageResolverService;
 import org.example.wayveesystem.service.LocationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
@@ -28,12 +31,14 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 public class LocationServiceImpl implements LocationService {
 
-    private static final int MAX_GRID_RADIUS_METERS = 3000;
+    private static final int MAX_GRID_RADIUS_METERS = 10000;
 
     private final OverpassApiClient overpassApiClient;
     private final RestClient nominatimRestClient;
     private final OsmPlaceMapper osmPlaceMapper;
     private final PlaceResponseMapper placeResponseMapper;
+    private final ImageResolverService imageResolverService;
+    private final SavedPlaceRepository savedPlaceRepository;
     private final AsyncLoadingCache<GridCacheKey, List<OsmPlace>> poiAsyncLoadingCache;
 
     @Value("${wayvee.cache.grid-precision:0.02}")
@@ -51,24 +56,28 @@ public class LocationServiceImpl implements LocationService {
 
         List<OsmPlace> allGridPlaces = getFromCacheOrFetchAll(cacheKey);
 
-        List<LocationResponse> filteredLocations = allGridPlaces.stream()
+        List<OsmPlace> filteredPlaces = allGridPlaces.stream()
                 .map(this::enrichPlaceData)
                 .filter(place -> matchesDistance(place, userLat, userLng, requestedRadius))
                 .filter(place -> matchesCategories(place, request.categories()))
                 .filter(place -> matchesCuisines(place, request.cuisines()))
                 .filter(place -> matchesMinRating(place, request.minRating()))
                 .filter(place -> matchesKeyword(place, request.keyword()))
-                .map(place -> placeResponseMapper.toResponse(place, userLat, userLng))
-                .sorted(Comparator.comparingDouble(LocationResponse::distanceMeters))
+                .sorted(Comparator.comparingDouble(place -> calculateDistanceMeters(
+                        userLat, userLng, place.latitude(), place.longitude())))
                 .toList();
 
-        int totalElements = filteredLocations.size();
+        int totalElements = filteredPlaces.size();
         int fromIndex = Math.min(request.page() * request.size(), totalElements);
         int toIndex = Math.min(fromIndex + request.size(), totalElements);
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / request.size());
+        List<LocationResponse> pageLocations = filteredPlaces.subList(fromIndex, toIndex).parallelStream()
+                .map(this::resolveImage)
+                .map(place -> placeResponseMapper.toResponse(place, userLat, userLng))
+                .toList();
 
         return new LocationPageResponse(
-                filteredLocations.subList(fromIndex, toIndex),
+                pageLocations,
                 request.page(), request.size(), totalElements, totalPages
         );
     }
@@ -108,6 +117,20 @@ public class LocationServiceImpl implements LocationService {
         }
 
         OsmPlace enrichedPlace = enrichPlaceData(rawPlace);
+        var savedPlace = savedPlaceRepository.findByOsmId(osmId).orElse(null);
+        if (savedPlace != null && savedPlace.getImageUrl() != null && !savedPlace.getImageUrl().isBlank()) {
+            enrichedPlace = withImage(enrichedPlace, savedPlace.getImageUrl(), savedPlace.getImageSource());
+        } else {
+            var resolution = imageResolverService.resolve(enrichedPlace);
+            if (resolution.imageUrl() != null) {
+                enrichedPlace = withImage(enrichedPlace, resolution.imageUrl(), resolution.imageSource().name());
+                if (savedPlace != null) {
+                    savedPlace.setImageUrl(resolution.imageUrl());
+                    savedPlace.setImageSource(resolution.imageSource().name());
+                    savedPlaceRepository.save(savedPlace);
+                }
+            }
+        }
         return placeResponseMapper.toResponse(enrichedPlace, enrichedPlace.latitude(), enrichedPlace.longitude());
     }
 
@@ -173,9 +196,26 @@ public class LocationServiceImpl implements LocationService {
         }
         return new OsmPlace(
                 place.osmId(), place.name(), place.categoryCode(), place.address(),
-                place.latitude(), place.longitude(), place.imageUrl(), place.openingHours(),
+                place.latitude(), place.longitude(), place.imageUrl(), place.imageSource(), place.openingHours(),
                 place.phone(), place.website(), tags
         );
+    }
+
+    private OsmPlace withImage(OsmPlace place, String imageUrl, String source) {
+        ImageSource imageSource;
+        try { imageSource = source == null ? null : ImageSource.valueOf(source); }
+        catch (IllegalArgumentException ex) { imageSource = null; }
+        return new OsmPlace(place.osmId(), place.name(), place.categoryCode(), place.address(), place.latitude(),
+                place.longitude(), imageUrl, imageSource, place.openingHours(), place.phone(), place.website(), place.tags());
+    }
+
+    private OsmPlace resolveImage(OsmPlace place) {
+        if (place.imageUrl() != null && !place.imageUrl().isBlank()) {
+            return place;
+        }
+        var resolution = imageResolverService.resolve(place);
+        return resolution.imageUrl() == null ? place
+                : withImage(place, resolution.imageUrl(), resolution.imageSource().name());
     }
 
     private boolean matchesDistance(OsmPlace place, double lat, double lng, int maxRadius) {

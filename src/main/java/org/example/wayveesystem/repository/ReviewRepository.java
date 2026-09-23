@@ -1,4 +1,4 @@
-package org.example.wayveesystem.respository;
+package org.example.wayveesystem.repository;
 
 import org.example.wayveesystem.model.Review;
 import org.example.wayveesystem.model.User;

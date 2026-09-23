@@ -19,6 +19,9 @@ public record LocationFilterRequest(
         Integer page,
         Integer size
 ) {
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 100;
+
     public LocationFilterRequest {
         if (radiusMeters == null || radiusMeters <= 0) {
             radiusMeters = 1000;
@@ -26,6 +29,6 @@ public record LocationFilterRequest(
             radiusMeters = 10000;
         }
         page = page == null || page < 0 ? 0 : page;
-        size = size == null || size < 1 ? 6 : Math.min(size, 10);
+        size = size == null || size < 1 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
     }
 }

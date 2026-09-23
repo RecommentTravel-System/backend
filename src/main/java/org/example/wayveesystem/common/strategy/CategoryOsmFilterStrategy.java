@@ -66,14 +66,15 @@ public class CategoryOsmFilterStrategy implements OsmFilterStrategy {
                 String singleVal = values.iterator().next();
                 clauses.add(String.format(java.util.Locale.US, "node[\"%s\"=\"%s\"](around:%d,%.6f,%.6f);", tagKey, singleVal, radiusMeters, lat, lng));
                 clauses.add(String.format(java.util.Locale.US, "way[\"%s\"=\"%s\"](around:%d,%.6f,%.6f);", tagKey, singleVal, radiusMeters, lat, lng));
+                clauses.add(String.format(java.util.Locale.US, "relation[\"%s\"=\"%s\"](around:%d,%.6f,%.6f);", tagKey, singleVal, radiusMeters, lat, lng));
             } else {
                 String regexVal = values.stream().sorted().collect(Collectors.joining("|"));
                 clauses.add(String.format(java.util.Locale.US, "node[\"%s\"~\"^(%s)$\"](around:%d,%.6f,%.6f);", tagKey, regexVal, radiusMeters, lat, lng));
                 clauses.add(String.format(java.util.Locale.US, "way[\"%s\"~\"^(%s)$\"](around:%d,%.6f,%.6f);", tagKey, regexVal, radiusMeters, lat, lng));
+                clauses.add(String.format(java.util.Locale.US, "relation[\"%s\"~\"^(%s)$\"](around:%d,%.6f,%.6f);", tagKey, regexVal, radiusMeters, lat, lng));
             }
         }
 
         return clauses;
     }
 }
-

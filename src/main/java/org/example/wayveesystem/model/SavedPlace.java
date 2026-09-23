@@ -49,6 +49,9 @@ public class SavedPlace {
     @Column(name = "image_url")
     String imageUrl;
 
+    @Column(name = "image_source")
+    String imageSource;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;

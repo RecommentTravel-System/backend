@@ -9,7 +9,7 @@ import org.example.wayveesystem.dto.request.CategoryRequest;
 import org.example.wayveesystem.dto.response.CategoryResponse;
 import org.example.wayveesystem.mapper.CategoryMapper;
 import org.example.wayveesystem.model.Category;
-import org.example.wayveesystem.respository.CategoryRepository;
+import org.example.wayveesystem.repository.CategoryRepository;
 import org.example.wayveesystem.service.CategoryService;
 import org.springframework.stereotype.Service;
 

@@ -59,12 +59,11 @@ class OsmFilterFactoryTest {
 
         Assertions.assertNotNull(clauses);
         Assertions.assertFalse(clauses.isEmpty());
-        // 5 tag keys (amenity, shop, tourism, leisure, craft) * 2 (node + way) = 10 clauses max
-        Assertions.assertTrue(clauses.size() <= 10, "Clauses count should be minimized by regex grouping (<= 10 clauses)");
+        // 5 tag keys (amenity, shop, tourism, leisure, craft) * 3 (node + way + relation) = 15 clauses max
+        Assertions.assertTrue(clauses.size() <= 15, "Clauses count should be minimized by regex grouping (<= 15 clauses)");
 
         // Verify amenity regex group
         boolean hasAmenityRegex = clauses.stream().anyMatch(c -> c.contains("node[\"amenity\"~\"^("));
         Assertions.assertTrue(hasAmenityRegex, "Should contain grouped regex for amenity tag key");
     }
 }
-

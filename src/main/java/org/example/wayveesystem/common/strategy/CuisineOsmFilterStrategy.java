@@ -17,7 +17,8 @@ public class CuisineOsmFilterStrategy implements OsmFilterStrategy {
         String tag = "cuisine\"=\"" + filterValue.toLowerCase();
         return List.of(
                 String.format(java.util.Locale.US, "node[\"%s\"](around:%d,%.6f,%.6f);", tag, radiusMeters, lat, lng),
-                String.format(java.util.Locale.US, "way[\"%s\"](around:%d,%.6f,%.6f);", tag, radiusMeters, lat, lng)
+                String.format(java.util.Locale.US, "way[\"%s\"](around:%d,%.6f,%.6f);", tag, radiusMeters, lat, lng),
+                String.format(java.util.Locale.US, "relation[\"%s\"](around:%d,%.6f,%.6f);", tag, radiusMeters, lat, lng)
         );
     }
 }

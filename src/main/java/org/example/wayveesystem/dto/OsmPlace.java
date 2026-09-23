@@ -1,5 +1,7 @@
 package org.example.wayveesystem.dto;
 
+import org.example.wayveesystem.common.enums.ImageSource;
+
 import java.io.Serializable;
 import java.util.Map;
 
@@ -16,6 +18,7 @@ public record OsmPlace(
         Double latitude,
         Double longitude,
         String imageUrl,
+        ImageSource imageSource,
         String openingHours,
         String phone,
         String website,

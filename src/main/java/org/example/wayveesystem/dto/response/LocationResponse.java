@@ -11,6 +11,7 @@ public record LocationResponse(
         Double latitude,
         Double longitude,
         String imageUrl,
+        String imageSource,
         String openingHours,
         String phone,
         String website,
