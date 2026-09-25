@@ -60,6 +60,7 @@ public enum ErrorCode {
     COMPANIONS_REQUIRED(5004, "Thông tin người đi cùng không được để trống", HttpStatus.BAD_REQUEST),
     PASSENGER_COUNT_REQUIRED(5005, "Số lượng người không được để trống", HttpStatus.BAD_REQUEST),
     TRAVEL_STYLE_REQUIRED(5006, "Phong cách chuyến đi không được để trống", HttpStatus.BAD_REQUEST),
+    TRIP_NOT_FOUND(5007, "Trip not found", HttpStatus.NOT_FOUND),
     ;
     int code;
     String message;

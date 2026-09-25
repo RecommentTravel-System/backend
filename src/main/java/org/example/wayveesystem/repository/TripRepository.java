@@ -9,10 +9,13 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TripRepository extends JpaRepository<Trip, Long> {
-    List<Trip> findByUser(User user);
+    List<Trip> findByUserAndDeletedFalseOrderByCreatedAtDesc(User user);
+
+    Optional<Trip> findByTripIdAndUserAndDeletedFalse(Long tripId, User user);
 
     long countByCreatedAtAfter(LocalDateTime from);
 

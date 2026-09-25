@@ -10,18 +10,23 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailServiceImpl implements EmailService {
     private final JavaMailSender mailSender;
+    private final SpringTemplateEngine templateEngine;
 
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    private void sendHtmlEmail(String toEmail, String subject, String htmlContent) {
+    private void sendHtmlEmail(String toEmail, String subject, String templateName, Context context) {
         try {
+            String htmlContent = templateEngine.process(templateName, context);
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -38,25 +43,17 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendVerifyEmailOtp(String toEmail, String otp) {
-        String subject = "Verify your email - WayveeSystem";
-        String htmlContent = "<div style=\"font-family: Arial, sans-serif; padding: 20px;\">"
-                + "<h2>Verify Your Email</h2>"
-                + "<p>Thank you for registering with WayveeSystem. Your verification OTP code is:</p>"
-                + "<h1 style=\"color: #4CAF50; letter-spacing: 5px;\">" + otp + "</h1>"
-                + "<p>This code will expire in 5 minutes. Please do not share this code with anyone.</p>"
-                + "</div>";
-        sendHtmlEmail(toEmail, subject, htmlContent);
+        Context context = new Context();
+        context.setVariable("otp", otp);
+
+        sendHtmlEmail(toEmail, "Verify your email - WayveeSystem", "verify-email", context);
     }
 
     @Override
     public void sendForgotPasswordOtp(String toEmail, String otp) {
-        String subject = "Reset your password - WayveeSystem";
-        String htmlContent = "<div style=\"font-family: Arial, sans-serif; padding: 20px;\">"
-                + "<h2>Reset Your Password</h2>"
-                + "<p>You requested a password reset. Your OTP code is:</p>"
-                + "<h1 style=\"color: #FF5722; letter-spacing: 5px;\">" + otp + "</h1>"
-                + "<p>This code will expire in 5 minutes. If you did not request this, please ignore this email.</p>"
-                + "</div>";
-        sendHtmlEmail(toEmail, subject, htmlContent);
+        Context context = new Context();
+        context.setVariable("otp", otp);
+
+        sendHtmlEmail(toEmail, "Reset your password - WayveeSystem", "forgot-password", context);
     }
 }

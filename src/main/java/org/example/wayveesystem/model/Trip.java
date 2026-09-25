@@ -46,6 +46,18 @@ public class Trip {
     @Column(name = "status")
     TripStatus status;
 
+    /** True after the user confirms the order of places in this trip. */
+    @Builder.Default
+    @Column(name = "itinerary_arranged", nullable = false, columnDefinition = "boolean default false")
+    Boolean itineraryArranged = false;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    LocalDateTime deletedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
