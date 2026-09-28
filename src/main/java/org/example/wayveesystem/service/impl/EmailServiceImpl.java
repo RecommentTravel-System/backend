@@ -1,14 +1,14 @@
 package org.example.wayveesystem.service.impl;
 
+import com.resend.Resend;
+import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.CreateEmailOptions;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.service.EmailService;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
@@ -17,26 +17,42 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 @RequiredArgsConstructor
 @Slf4j
 public class EmailServiceImpl implements EmailService {
-    private final JavaMailSender mailSender;
+
     private final SpringTemplateEngine templateEngine;
 
-    @Value("${spring.mail.username}")
+    @Value("${resend.api-key}")
+    private String resendApiKey;
+
+    @Value("${resend.from-email}")
     private String fromEmail;
 
-    private void sendHtmlEmail(String toEmail, String subject, String templateName, Context context) {
+    private void sendHtmlEmail(
+            String toEmail,
+            String subject,
+            String templateName,
+            Context context
+    ) {
         try {
             String htmlContent = templateEngine.process(templateName, context);
 
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            Resend resend = new Resend(resendApiKey);
 
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-        } catch (Exception e) {
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                    .from(fromEmail)
+                    .to(toEmail)
+                    .subject(subject)
+                    .html(htmlContent)
+                    .build();
+
+            resend.emails().send(params);
+
+            log.info("Email sent successfully to {}", toEmail);
+
+        } catch (ResendException e) {
             log.error("Failed to send email to {}", toEmail, e);
+            throw new AppException(ErrorCode.EMAIL_SEND_FAILED);
+        } catch (Exception e) {
+            log.error("Unexpected error while sending email to {}", toEmail, e);
             throw new AppException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
@@ -46,7 +62,12 @@ public class EmailServiceImpl implements EmailService {
         Context context = new Context();
         context.setVariable("otp", otp);
 
-        sendHtmlEmail(toEmail, "Verify your email - WayveeSystem", "verify-email", context);
+        sendHtmlEmail(
+                toEmail,
+                "Verify your email - WayveeSystem",
+                "verify-email",
+                context
+        );
     }
 
     @Override
@@ -54,6 +75,11 @@ public class EmailServiceImpl implements EmailService {
         Context context = new Context();
         context.setVariable("otp", otp);
 
-        sendHtmlEmail(toEmail, "Reset your password - WayveeSystem", "forgot-password", context);
+        sendHtmlEmail(
+                toEmail,
+                "Reset your password - WayveeSystem",
+                "forgot-password",
+                context
+        );
     }
 }
