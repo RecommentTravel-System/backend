@@ -2,7 +2,7 @@ package org.example.wayveesystem.mapper;
 
 import org.example.wayveesystem.dto.request.UserCreationRequest;
 import org.example.wayveesystem.dto.response.UserResponse;
-import org.example.wayveesystem.entity.User;
+import org.example.wayveesystem.model.User;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -13,7 +13,6 @@ public class UserMapper {
             return null;
         }
         return User.builder()
-                .username(request.getUsername())
                 .email(request.getEmail())
                 .password(request.getPassword())
                 .fullName(request.getFullName())
@@ -27,12 +26,12 @@ public class UserMapper {
         }
         return UserResponse.builder()
                 .userId(user.getUserId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
                 .createdAt(user.getCreatedAt())
                 .status(user.getStatus())
+                .role(user.getRole())
                 .build();
     }
 }

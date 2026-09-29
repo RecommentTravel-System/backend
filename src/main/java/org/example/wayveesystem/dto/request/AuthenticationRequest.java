@@ -10,8 +10,8 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AuthenticationRequest {
-    @NotBlank(message = "Username or email is required")
-    String usernameOrEmail;
+    @NotBlank(message = "Email is required")
+    String email;
 
     @NotBlank(message = "Password is required")
     String password;
