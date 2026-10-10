@@ -10,6 +10,9 @@ import org.example.wayveesystem.common.response.ApiResponse;
 import org.example.wayveesystem.dto.request.TripRequest;
 import org.example.wayveesystem.dto.request.TripValidationRequest;
 import org.example.wayveesystem.dto.response.TripResponse;
+import org.example.wayveesystem.dto.request.ItineraryOptimizeRequest;
+import org.example.wayveesystem.dto.response.ItineraryOptimizeResponse;
+import org.example.wayveesystem.service.TripOptimizationService;
 import org.example.wayveesystem.service.TripService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +29,15 @@ import java.util.List;
 public class TripController {
 
     TripService tripService;
+    TripOptimizationService tripOptimizationService;
+
+    @Operation(summary = "Tự động tối ưu hóa lịch trình các ngày", description = "Phân cụm các điểm vào các ngày bằng K-means cân bằng và sắp xếp thứ tự di chuyển tối ưu bằng Nearest Neighbor + 2-opt")
+    @PostMapping("/optimize")
+    public ResponseEntity<ApiResponse<ItineraryOptimizeResponse>> optimizeItinerary(
+            @Valid @RequestBody ItineraryOptimizeRequest request) {
+        ItineraryOptimizeResponse response = tripOptimizationService.optimizeItinerary(request);
+        return ResponseEntity.ok(ApiResponse.success("Tối ưu hóa lịch trình thành công", response));
+    }
 
     @Operation(summary = "Validate thông tin chuyến đi bước 1", description = "Kiểm tra tính hợp lệ của tất cả thông tin đầu vào ở Bước 1")
     @PostMapping("/validate")
@@ -71,6 +83,14 @@ public class TripController {
     public ResponseEntity<ApiResponse<TripResponse>> confirmItinerary(@PathVariable("id") Long tripId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Itinerary confirmed successfully", tripService.confirmItinerary(tripId)));
+    }
+
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @Operation(summary = "Cancel a trip")
+    @PatchMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<TripResponse>> cancelTrip(@PathVariable("id") Long tripId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Trip cancelled successfully", tripService.cancelTrip(tripId)));
     }
 
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")

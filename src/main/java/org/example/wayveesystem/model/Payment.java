@@ -5,6 +5,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.example.wayveesystem.common.enums.PaymentMethod;
 import org.example.wayveesystem.common.enums.PaymentStatus;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,10 +39,17 @@ public class Payment {
     @Column(name = "transaction_code")
     String transactionCode;
 
+    @Column(name = "payment_link_id")
+    String paymentLinkId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     PaymentStatus status;
 
     @Column(name = "paid_at")
     LocalDateTime paidAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    LocalDateTime createdAt;
 }

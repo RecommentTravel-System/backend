@@ -34,6 +34,7 @@ public class SecurityConfig {
             "/api/subscriptions/**",
             "/api/v1/trips/**",
             "/api/trips/**",
+            "/api/payments/payos-webhook",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"

@@ -61,6 +61,23 @@ public enum ErrorCode {
     PASSENGER_COUNT_REQUIRED(5005, "Số lượng người không được để trống", HttpStatus.BAD_REQUEST),
     TRAVEL_STYLE_REQUIRED(5006, "Phong cách chuyến đi không được để trống", HttpStatus.BAD_REQUEST),
     TRIP_NOT_FOUND(5007, "Trip not found", HttpStatus.NOT_FOUND),
+    TRIP_CONFLICT(5008, "Trip has been modified by another process. Please refresh and try again.", HttpStatus.CONFLICT),
+    REPLAN_PROPOSAL_EXPIRED(5009, "Replan proposal has expired or does not exist. Please request a new preview.", HttpStatus.BAD_REQUEST),
+    REPLAN_PROPOSAL_INVALID(5010, "Replan proposal validation failed.", HttpStatus.BAD_REQUEST),
+    TRIP_LOCATION_NOT_FOUND(5011, "Trip location not found", HttpStatus.NOT_FOUND),
+    
+    SOURCE_REQUIRED(4020, "POI Source (OSM/OVERTURE) is required", HttpStatus.BAD_REQUEST),
+    FILE_PATH_REQUIRED(4021, "File path is required", HttpStatus.BAD_REQUEST),
+    INVALID_POI_FILE(4022, "Invalid POI file or format", HttpStatus.BAD_REQUEST),
+    POI_FILE_NOT_FOUND(4023, "POI file not found on server", HttpStatus.NOT_FOUND),
+    POI_IMPORT_FAILED(4024, "Failed to import POI data", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    PAYMENT_NOT_FOUND(6001, "Payment not found", HttpStatus.NOT_FOUND),
+    PAYMENT_ALREADY_PAID(6002, "Payment is already completed", HttpStatus.BAD_REQUEST),
+    PAYMENT_INVALID_SIGNATURE(6003, "Invalid webhook signature", HttpStatus.BAD_REQUEST),
+    PAYMENT_CREATION_FAILED(6004, "Failed to create payment link", HttpStatus.INTERNAL_SERVER_ERROR),
+    PAYMENT_AMOUNT_MISMATCH(6005, "Payment amount mismatch", HttpStatus.BAD_REQUEST),
+    PAYMENT_NOT_PENDING(6006, "Payment is not in PENDING state", HttpStatus.BAD_REQUEST),
     ;
     int code;
     String message;

@@ -1,8 +1,11 @@
 package org.example.wayveesystem.repository;
 
+import org.example.wayveesystem.common.enums.PaymentStatus;
 import org.example.wayveesystem.model.Payment;
 import org.example.wayveesystem.model.Subscription;
-import org.example.wayveesystem.common.enums.PaymentStatus;
+import org.example.wayveesystem.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,8 +18,16 @@ import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
+
     List<Payment> findBySubscription(Subscription subscription);
+
     Optional<Payment> findByTransactionCode(String transactionCode);
+
+    Optional<Payment> findByPaymentLinkId(String paymentLinkId);
+
+    Optional<Payment> findByPaymentIdAndSubscription_User(Long paymentId, User user);
+
+    Page<Payment> findBySubscription_User(User user, Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.status = :status")
     BigDecimal sumAmountByStatus(@Param("status") PaymentStatus status);
@@ -25,18 +36,18 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     BigDecimal sumAmountByStatusFrom(@Param("status") PaymentStatus status, @Param("from") LocalDateTime from);
 
     @Query("SELECT CAST(p.paidAt AS date) as d, COALESCE(SUM(p.amount), 0) " +
-            "FROM Payment p WHERE p.status = 'SUCCESS' AND p.paidAt >= :from " +
+            "FROM Payment p WHERE (p.status = 'SUCCESS' OR p.status = 'PAID') AND p.paidAt >= :from " +
             "GROUP BY CAST(p.paidAt AS date) ORDER BY d")
     List<Object[]> revenueGroupedByDay(@Param("from") LocalDateTime from);
 
     @Query("SELECT FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'week', p.paidAt), COALESCE(SUM(p.amount), 0) " +
-            "FROM Payment p WHERE p.status = 'SUCCESS' AND p.paidAt >= :from " +
+            "FROM Payment p WHERE (p.status = 'SUCCESS' OR p.status = 'PAID') AND p.paidAt >= :from " +
             "GROUP BY FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'week', p.paidAt) " +
             "ORDER BY FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'week', p.paidAt)")
     List<Object[]> revenueGroupedByWeek(@Param("from") LocalDateTime from);
 
     @Query("SELECT FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'month', p.paidAt), COALESCE(SUM(p.amount), 0) " +
-            "FROM Payment p WHERE p.status = 'SUCCESS' AND p.paidAt >= :from " +
+            "FROM Payment p WHERE (p.status = 'SUCCESS' OR p.status = 'PAID') AND p.paidAt >= :from " +
             "GROUP BY FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'month', p.paidAt) " +
             "ORDER BY FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'month', p.paidAt)")
     List<Object[]> revenueGroupedByMonth(@Param("from") LocalDateTime from);

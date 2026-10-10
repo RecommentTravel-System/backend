@@ -25,12 +25,14 @@ import org.example.wayveesystem.mapper.UserMapper;
 import org.example.wayveesystem.repository.InvalidatedTokenRepository;
 import org.example.wayveesystem.repository.UserRepository;
 import org.example.wayveesystem.service.AuthenticationService;
+import org.example.wayveesystem.service.CloudinaryImageService;
 import org.example.wayveesystem.service.EmailService;
 import org.example.wayveesystem.service.OtpService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.text.ParseException;
 import java.time.Instant;
@@ -50,6 +52,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     InvalidatedTokenRepository invalidatedTokenRepository;
     OtpService otpService;
     EmailService emailService;
+    CloudinaryImageService cloudinaryImageService;
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -383,5 +386,33 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             log.warn("Invalid token: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
+    }
+
+    private User getCurrentUser() {
+        String userIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findById(Long.valueOf(userIdStr))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    @Override
+    public UserResponse getMyProfile() {
+        return userMapper.toUserResponse(getCurrentUser());
+    }
+
+    @Override
+    public UserResponse updateAvatar(MultipartFile file) {
+        User user = getCurrentUser();
+        var uploadResponse = cloudinaryImageService.uploadAvatar(file);
+        user.setAvatarUrl(uploadResponse.getSecureUrl());
+        User savedUser = userRepository.save(user);
+        return userMapper.toUserResponse(savedUser);
+    }
+
+    @Override
+    public UserResponse removeAvatar() {
+        User user = getCurrentUser();
+        user.setAvatarUrl(null);
+        User savedUser = userRepository.save(user);
+        return userMapper.toUserResponse(savedUser);
     }
 }

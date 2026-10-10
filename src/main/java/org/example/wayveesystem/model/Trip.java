@@ -58,6 +58,11 @@ public class Trip {
     @Column(name = "deleted_at")
     LocalDateTime deletedAt;
 
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    Long version = 0L;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
