@@ -24,7 +24,7 @@ public enum ErrorCode {
     USER_INACTIVE(1012, "User is inactive", HttpStatus.BAD_REQUEST),
     USER_SUSPENDED(1013, "User is suspended", HttpStatus.BAD_REQUEST),
     USER_DELETED(1014, "User is deleted", HttpStatus.BAD_REQUEST),
-    PASSWORD_INCORRECT(1015, "Password incorrect", HttpStatus.BAD_REQUEST),
+    PASSWORD_INCORRECT(1015, "Tên đăng nhập hoặc mật khẩu không chính xác", HttpStatus.BAD_REQUEST),
     USER_NOT_VERIFIED(2001, "Please verify your email before logging in", HttpStatus.FORBIDDEN),
     OTP_EXPIRED(3001, "OTP has expired", HttpStatus.BAD_REQUEST),
     OTP_INVALID(3002, "OTP is invalid", HttpStatus.BAD_REQUEST),

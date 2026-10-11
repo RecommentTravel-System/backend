@@ -96,13 +96,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         var user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+                .orElseThrow(() -> new AppException(ErrorCode.PASSWORD_INCORRECT));
 
         validateUserStatus(user);
         boolean authenticated = passwordEncoder.matches(request.getPassword(), user.getPassword());
 
         if (!authenticated) {
-            throw new AppException(ErrorCode.UNAUTHENTICATED);
+            throw new AppException(ErrorCode.PASSWORD_INCORRECT);
         }
 
         var accessToken = generateAccessToken(user);
@@ -403,7 +403,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public UserResponse updateAvatar(MultipartFile file) {
         User user = getCurrentUser();
         var uploadResponse = cloudinaryImageService.uploadAvatar(file);
-        user.setAvatarUrl(uploadResponse.getSecureUrl());
+        user.setAvatarUrl(uploadResponse.url());
         User savedUser = userRepository.save(user);
         return userMapper.toUserResponse(savedUser);
     }
