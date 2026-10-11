@@ -49,6 +49,14 @@ public class Subscription {
     @Column(name = "status")
     SubscriptionStatus status;
 
+    @Builder.Default
+    @Column(name = "remaining_trips")
+    Integer remainingTrips = 0;
+
+    @Builder.Default
+    @Column(name = "total_trips")
+    Integer totalTrips = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;

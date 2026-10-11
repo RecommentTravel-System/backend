@@ -3,28 +3,47 @@ package org.example.wayveesystem.service.impl;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.example.wayveesystem.common.enums.SubscriptionStatus;
+import org.example.wayveesystem.common.exception.AppException;
+import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.request.ItineraryOptimizeRequest;
 import org.example.wayveesystem.dto.request.OptimizePlaceItemDto;
 import org.example.wayveesystem.dto.response.ItineraryOptimizeResponse;
 import org.example.wayveesystem.dto.response.OptimizedDayDto;
+import org.example.wayveesystem.model.Subscription;
+import org.example.wayveesystem.model.Trip;
+import org.example.wayveesystem.model.User;
+import org.example.wayveesystem.repository.SubscriptionRepository;
+import org.example.wayveesystem.repository.TripRepository;
+import org.example.wayveesystem.repository.UserRepository;
 import org.example.wayveesystem.service.TripOptimizationService;
 import org.example.wayveesystem.service.replanning.constraint.ScheduleTimeEvaluator;
 import org.example.wayveesystem.service.replanning.distance.DistanceMatrixCalculator;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class TripOptimizationServiceImpl implements TripOptimizationService {
 
     DistanceMatrixCalculator distanceCalculator;
+    TripRepository tripRepository;
+    UserRepository userRepository;
+    SubscriptionRepository subscriptionRepository;
 
     @Override
+    @Transactional
     public ItineraryOptimizeResponse optimizeItinerary(ItineraryOptimizeRequest request) {
+        checkAndDeductTripCreditIfNeeded(request.getTripId());
         int totalDays = request.getTotalDays() != null && request.getTotalDays() > 0 ? request.getTotalDays() : 1;
         LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now();
         LocalTime startTime = request.getDailyStartTime() != null ? request.getDailyStartTime() : ScheduleTimeEvaluator.DEFAULT_START_TIME;
@@ -334,5 +353,75 @@ public class TripOptimizationServiceImpl implements TripOptimizationService {
 
     private double round(double val) {
         return Math.round(val * 100.0) / 100.0;
+    }
+
+    private void checkAndDeductTripCreditIfNeeded(Long tripId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        Long userId;
+        try {
+            userId = Long.valueOf(auth.getName());
+        } catch (NumberFormatException e) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Trường hợp có tripId
+        if (tripId != null) {
+            Trip trip = tripRepository.findByTripIdAndUserAndDeletedFalse(tripId, currentUser)
+                    .orElseThrow(() -> new AppException(ErrorCode.TRIP_NOT_FOUND));
+
+            // Nếu chuyến đi này đã được trả tiền / tối ưu trước đó -> hoàn toàn miễn phí
+            if (Boolean.TRUE.equals(trip.getIsUnlocked())) {
+                log.info("Trip {} is already unlocked. Free re-optimization for user {}", tripId, userId);
+                return;
+            }
+
+            // Nếu chuyến đi chưa mở khóa -> trừ 1 lượt từ gói còn hạn của user
+            List<Subscription> activeSubs = subscriptionRepository
+                    .findByUserAndStatusOrderByCreatedAtAsc(currentUser, SubscriptionStatus.ACTIVE);
+
+            Subscription availableSub = activeSubs.stream()
+                    .filter(s -> s.getRemainingTrips() != null && s.getRemainingTrips() > 0)
+                    .findFirst()
+                    .orElse(null);
+
+            if (availableSub == null) {
+                log.warn("User {} has no remaining trip credits in active subscriptions for trip {}", userId, tripId);
+                throw new AppException(ErrorCode.TRIP_PAYMENT_REQUIRED);
+            }
+
+            // Trừ 1 chuyến đi
+            int newRemaining = availableSub.getRemainingTrips() - 1;
+            availableSub.setRemainingTrips(newRemaining);
+            subscriptionRepository.save(availableSub);
+
+            // Đánh dấu chuyến đi này đã mở khóa
+            trip.setIsUnlocked(true);
+            trip.setItineraryArranged(true);
+            tripRepository.save(trip);
+
+            log.info("Successfully deducted 1 trip credit from subscription {} (remaining: {}). Trip {} is unlocked.",
+                    availableSub.getSubscriptionId(), newRemaining, tripId);
+        } else {
+            // Nếu không truyền tripId, kiểm tra xem user có gói hợp lệ hay không
+            List<Subscription> activeSubs = subscriptionRepository
+                    .findByUserAndStatusOrderByCreatedAtAsc(currentUser, SubscriptionStatus.ACTIVE);
+
+            Subscription availableSub = activeSubs.stream()
+                    .filter(s -> s.getRemainingTrips() != null && s.getRemainingTrips() > 0)
+                    .findFirst()
+                    .orElse(null);
+
+            if (availableSub == null) {
+                log.warn("User {} has no remaining trip credits in active subscriptions", userId);
+                throw new AppException(ErrorCode.TRIP_PAYMENT_REQUIRED);
+            }
+        }
     }
 }

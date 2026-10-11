@@ -65,6 +65,7 @@ public enum ErrorCode {
     REPLAN_PROPOSAL_EXPIRED(5009, "Replan proposal has expired or does not exist. Please request a new preview.", HttpStatus.BAD_REQUEST),
     REPLAN_PROPOSAL_INVALID(5010, "Replan proposal validation failed.", HttpStatus.BAD_REQUEST),
     TRIP_LOCATION_NOT_FOUND(5011, "Trip location not found", HttpStatus.NOT_FOUND),
+    TRIP_PAYMENT_REQUIRED(5012, "Chuyến đi này chưa được thanh toán hoặc gói chuyến đi đã hết lượt. Vui lòng chọn gói thanh toán để tối ưu lịch trình.", HttpStatus.PAYMENT_REQUIRED),
     
     SOURCE_REQUIRED(4020, "POI Source (OSM/OVERTURE) is required", HttpStatus.BAD_REQUEST),
     FILE_PATH_REQUIRED(4021, "File path is required", HttpStatus.BAD_REQUEST),

@@ -16,6 +16,8 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ItineraryOptimizeRequest {
 
+    Long tripId;
+
     @Min(value = 1, message = "Total days must be at least 1")
     @Builder.Default
     Integer totalDays = 1;

@@ -40,6 +40,7 @@ public class TripServiceImpl implements TripService {
                 .budget(request.getBudget())
                 .status(request.getStatus())
                 .itineraryArranged(Boolean.TRUE.equals(request.getItineraryArranged()))
+                .isUnlocked(Boolean.TRUE.equals(request.getIsUnlocked()))
                 .build();
         return toResponse(tripRepository.save(trip));
     }
@@ -87,6 +88,9 @@ public class TripServiceImpl implements TripService {
         trip.setStatus(request.getStatus());
         if (request.getItineraryArranged() != null) {
             trip.setItineraryArranged(request.getItineraryArranged());
+        }
+        if (request.getIsUnlocked() != null) {
+            trip.setIsUnlocked(request.getIsUnlocked());
         }
         return toResponse(tripRepository.save(trip));
     }
@@ -136,6 +140,7 @@ public class TripServiceImpl implements TripService {
                 .budget(trip.getBudget())
                 .status(trip.getStatus())
                 .itineraryArranged(trip.getItineraryArranged())
+                .isUnlocked(trip.getIsUnlocked())
                 .createdAt(trip.getCreatedAt())
                 .updatedAt(trip.getUpdatedAt())
                 .build();

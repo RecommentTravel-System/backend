@@ -31,6 +31,7 @@ public class TripController {
     TripService tripService;
     TripOptimizationService tripOptimizationService;
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Tự động tối ưu hóa lịch trình các ngày", description = "Phân cụm các điểm vào các ngày bằng K-means cân bằng và sắp xếp thứ tự di chuyển tối ưu bằng Nearest Neighbor + 2-opt")
     @PostMapping("/optimize")
     public ResponseEntity<ApiResponse<ItineraryOptimizeResponse>> optimizeItinerary(

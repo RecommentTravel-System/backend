@@ -25,6 +25,7 @@ public class TripResponse {
     BigDecimal budget;
     TripStatus status;
     Boolean itineraryArranged;
+    Boolean isUnlocked;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

@@ -15,6 +15,7 @@ import org.example.wayveesystem.common.enums.SubscriptionStatus;
 public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
     List<Subscription> findByUser(User user);
     Optional<Subscription> findFirstByUserAndStatusOrderByCreatedAtDesc(User user, SubscriptionStatus status);
+    List<Subscription> findByUserAndStatusOrderByCreatedAtAsc(User user, SubscriptionStatus status);
     List<Subscription> findByStatus(SubscriptionStatus status);
     List<Subscription> findByPlanType(SubscriptionPlanType planType);
     List<Subscription> findByStatusAndPlanType(SubscriptionStatus status, SubscriptionPlanType planType);

@@ -164,19 +164,10 @@ public class PaymentServiceImpl implements PaymentService {
 
                 // Kích hoạt Subscription
                 Subscription subscription = payment.getSubscription();
-                subscription.setStatus(SubscriptionStatus.ACTIVE);
-                LocalDateTime now = LocalDateTime.now();
-                subscription.setStartDate(now);
-
-                if (subscription.getPlanType() == SubscriptionPlanType.ANNUAL_PRO) {
-                    subscription.setEndDate(now.plusYears(1));
-                } else {
-                    subscription.setEndDate(now.plusMonths(1));
-                }
-                subscriptionRepository.save(subscription);
+                activateSubscription(subscription);
 
                 log.info("Successfully activated subscription {} for payment {}",
-                        subscription.getSubscriptionId(), payment.getPaymentId());
+                        subscription != null ? subscription.getSubscriptionId() : null, payment.getPaymentId());
             } else {
                 log.error("Payment amount mismatch for orderCode {}: expected {}, received {}",
                         orderCode, payment.getAmount(), webhookAmount);
@@ -204,27 +195,21 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getStatus() == PaymentStatus.PENDING) {
             try {
                 var paymentInfo = payOS.paymentRequests().get(payment.getPaymentId());
-                if (paymentInfo != null && "PAID".equalsIgnoreCase(paymentInfo.getStatus().name())) {
+                String payOsStatus = paymentInfo != null && paymentInfo.getStatus() != null ? paymentInfo.getStatus().name() : "UNKNOWN";
+                log.info("PayOS sync check for paymentId {}: PayOS status is '{}'", paymentId, payOsStatus);
+
+                if ("PAID".equalsIgnoreCase(payOsStatus)) {
+                    log.info("PaymentId {} verified as PAID on PayOS. Updating database...", paymentId);
                     payment.setStatus(PaymentStatus.PAID);
                     payment.setPaidAt(LocalDateTime.now());
                     paymentRepository.save(payment);
 
                     Subscription subscription = payment.getSubscription();
-                    if (subscription != null) {
-                        subscription.setStatus(SubscriptionStatus.ACTIVE);
-                        LocalDateTime now = LocalDateTime.now();
-                        subscription.setStartDate(now);
-                        if (subscription.getPlanType() == SubscriptionPlanType.ANNUAL_PRO) {
-                            subscription.setEndDate(now.plusYears(1));
-                        } else {
-                            subscription.setEndDate(now.plusMonths(1));
-                        }
-                        subscriptionRepository.save(subscription);
-                    }
-                    log.info("Synchronized PAID status directly from PayOS for paymentId {}", paymentId);
+                    activateSubscription(subscription);
+                    log.info("Successfully synchronized PAID status directly from PayOS for paymentId {}", paymentId);
                 }
             } catch (Exception e) {
-                log.debug("Could not sync PayOS status for paymentId {}: {}", paymentId, e.getMessage());
+                log.warn("Could not sync PayOS status for paymentId {}: {}", paymentId, e.getMessage(), e);
             }
         }
 
@@ -276,5 +261,36 @@ public class PaymentServiceImpl implements PaymentService {
                 .paidAt(payment.getPaidAt())
                 .createdAt(payment.getCreatedAt())
                 .build();
+    }
+
+    private void activateSubscription(Subscription subscription) {
+        if (subscription == null) return;
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        LocalDateTime now = LocalDateTime.now();
+        subscription.setStartDate(now);
+
+        if (subscription.getPlanType() == SubscriptionPlanType.ANNUAL_PRO) {
+            subscription.setEndDate(now.plusYears(1));
+        } else {
+            subscription.setEndDate(now.plusMonths(1));
+        }
+
+        int tripsCount = 1;
+        String planName = subscription.getPlanName() != null ? subscription.getPlanName().toLowerCase() : "";
+        if (planName.contains("10") || planName.contains("ten")) {
+            tripsCount = 10;
+        } else if (planName.contains("2") || planName.contains("duo")) {
+            tripsCount = 2;
+        } else if (subscription.getPrice() != null) {
+            if (subscription.getPrice().compareTo(BigDecimal.valueOf(200000)) >= 0) {
+                tripsCount = 10;
+            } else if (subscription.getPrice().compareTo(BigDecimal.valueOf(50000)) >= 0) {
+                tripsCount = 2;
+            }
+        }
+        subscription.setTotalTrips(tripsCount);
+        int currentRemaining = subscription.getRemainingTrips() != null ? subscription.getRemainingTrips() : 0;
+        subscription.setRemainingTrips(Math.max(currentRemaining, tripsCount));
+        subscriptionRepository.save(subscription);
     }
 }

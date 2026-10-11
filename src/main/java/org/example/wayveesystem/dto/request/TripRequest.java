@@ -39,6 +39,8 @@ public class TripRequest {
     /** Set true only after the user has confirmed the place order. */
     Boolean itineraryArranged;
 
+    Boolean isUnlocked;
+
     @AssertTrue(message = "INVALID_KEY")
     public boolean isDateRangeValid() {
         return startDate == null || endDate == null || !endDate.isBefore(startDate);
