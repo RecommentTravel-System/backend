@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class PaymentResponse {
 
     Long paymentId;
+    Long orderCode;
     Long subscriptionId;
     String planName;
     BigDecimal amount;

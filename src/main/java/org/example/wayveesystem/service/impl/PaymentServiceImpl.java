@@ -52,6 +52,9 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${payos.cancel-url}")
     String cancelUrl;
 
+    @Value("${payos.env-code:1}")
+    int envCode;
+
     private User getCurrentUser() {
         String userIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findById(Long.valueOf(userIdStr))
@@ -87,9 +90,17 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
         payment = paymentRepository.save(payment);
 
-        long orderCode = payment.getPaymentId();
+        long epochSeconds = System.currentTimeMillis() / 1000;
+        long paymentSuffix = payment.getPaymentId() % 10000;
+        long orderCode = (long) Math.max(1, Math.min(8, envCode)) * 100_000_000_000_000L
+                + (epochSeconds % 10_000_000_000L) * 10000L
+                + paymentSuffix;
+
+        payment.setOrderCode(orderCode);
+        paymentRepository.save(payment);
+
         long amountInt = subscription.getPrice().intValue();
-        String description = "Thanh toan " + orderCode;
+        String description = "Thanh toan " + payment.getPaymentId();
 
         CreatePaymentLinkRequest paymentData = CreatePaymentLinkRequest.builder()
                 .orderCode(orderCode)
@@ -103,7 +114,7 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             checkoutResponse = payOS.paymentRequests().create(paymentData);
         } catch (Exception e) {
-            log.error("Failed to create payOS payment link for paymentId: {}", orderCode, e);
+            log.error("Failed to create payOS payment link for orderCode: {} (paymentId: {})", orderCode, payment.getPaymentId(), e);
             payment.setStatus(PaymentStatus.FAILED);
             paymentRepository.save(payment);
             throw new AppException(ErrorCode.PAYMENT_CREATION_FAILED);
@@ -114,6 +125,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         return PaymentLinkResponse.builder()
                 .paymentId(payment.getPaymentId())
+                .orderCode(payment.getOrderCode())
                 .checkoutUrl(checkoutResponse.getCheckoutUrl())
                 .amount(payment.getAmount())
                 .status(payment.getStatus())
@@ -139,11 +151,13 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         long orderCode = webhookData.getOrderCode();
-        Payment payment = paymentRepository.findById(orderCode).orElse(null);
+        // Tìm kiếm theo orderCode mới hoặc fallback theo paymentId (đối với các đơn cũ)
+        Payment payment = paymentRepository.findByOrderCode(orderCode)
+                .orElseGet(() -> paymentRepository.findById(orderCode).orElse(null));
 
-        // Trường hợp webhook test của payOS hoặc không tìm thấy orderCode
+        // Trường hợp webhook test của payOS hoặc đơn thuộc môi trường khác (khi dùng chung account PayOS)
         if (payment == null) {
-            log.warn("Payment record not found for orderCode: {} (likely a PayOS test webhook)", orderCode);
+            log.warn("Payment record not found for orderCode: {} (likely PayOS test webhook or another environment)", orderCode);
             return;
         }
 
@@ -194,9 +208,10 @@ public class PaymentServiceImpl implements PaymentService {
         // Chủ động đồng bộ trạng thái với PayOS nếu đang PENDING (đề phòng webhook bị trễ hoặc chạy localhost)
         if (payment.getStatus() == PaymentStatus.PENDING) {
             try {
-                var paymentInfo = payOS.paymentRequests().get(payment.getPaymentId());
+                long orderCode = payment.getOrderCode() != null ? payment.getOrderCode() : payment.getPaymentId();
+                var paymentInfo = payOS.paymentRequests().get(orderCode);
                 String payOsStatus = paymentInfo != null && paymentInfo.getStatus() != null ? paymentInfo.getStatus().name() : "UNKNOWN";
-                log.info("PayOS sync check for paymentId {}: PayOS status is '{}'", paymentId, payOsStatus);
+                log.info("PayOS sync check for paymentId {} (orderCode {}): PayOS status is '{}'", paymentId, orderCode, payOsStatus);
 
                 if ("PAID".equalsIgnoreCase(payOsStatus)) {
                     log.info("PaymentId {} verified as PAID on PayOS. Updating database...", paymentId);
@@ -229,10 +244,11 @@ public class PaymentServiceImpl implements PaymentService {
             throw new AppException(ErrorCode.PAYMENT_NOT_PENDING);
         }
 
+        long orderCode = payment.getOrderCode() != null ? payment.getOrderCode() : payment.getPaymentId();
         try {
-            payOS.paymentRequests().cancel(payment.getPaymentId(), "User requested cancellation");
+            payOS.paymentRequests().cancel(orderCode, "User requested cancellation");
         } catch (Exception e) {
-            log.warn("Failed to cancel payment link on payOS for orderCode {}: {}", payment.getPaymentId(), e.getMessage());
+            log.warn("Failed to cancel payment link on payOS for orderCode {}: {}", orderCode, e.getMessage());
         }
 
         payment.setStatus(PaymentStatus.CANCELLED);
@@ -251,6 +267,7 @@ public class PaymentServiceImpl implements PaymentService {
     private PaymentResponse toPaymentResponse(Payment payment) {
         return PaymentResponse.builder()
                 .paymentId(payment.getPaymentId())
+                .orderCode(payment.getOrderCode() != null ? payment.getOrderCode() : payment.getPaymentId())
                 .subscriptionId(payment.getSubscription() != null ? payment.getSubscription().getSubscriptionId() : null)
                 .planName(payment.getSubscription() != null ? payment.getSubscription().getPlanName() : null)
                 .amount(payment.getAmount())

@@ -42,6 +42,9 @@ public class Payment {
     @Column(name = "payment_link_id")
     String paymentLinkId;
 
+    @Column(name = "order_code", unique = true)
+    Long orderCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     PaymentStatus status;

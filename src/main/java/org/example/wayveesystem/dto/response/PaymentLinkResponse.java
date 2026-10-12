@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 public class PaymentLinkResponse {
 
     Long paymentId;
+    Long orderCode;
     String checkoutUrl;
     BigDecimal amount;
     PaymentStatus status;
