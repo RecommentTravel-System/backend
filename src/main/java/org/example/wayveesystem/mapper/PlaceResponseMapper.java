@@ -1,12 +1,62 @@
 package org.example.wayveesystem.mapper;
 
+import org.example.wayveesystem.common.enums.ImageSource;
+import org.example.wayveesystem.common.enums.LocationSource;
 import org.example.wayveesystem.dto.OsmPlace;
 import org.example.wayveesystem.dto.response.LocationResponse;
+import org.example.wayveesystem.model.PoiCatalog;
 import org.example.wayveesystem.model.SavedPlace;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Component
 public class PlaceResponseMapper {
+
+    /**
+     * Maps a PoiCatalog (DB entity) to an in-memory OsmPlace POJO.
+     * Used for search results loaded from database catalog.
+     */
+    public OsmPlace toOsmPlace(PoiCatalog poi, String categoryCode) {
+        if (poi == null) {
+            return null;
+        }
+
+        Long osmId = null;
+        if (poi.getSourceId() != null) {
+            try {
+                osmId = Long.parseLong(poi.getSourceId());
+            } catch (NumberFormatException ignored) {
+                osmId = poi.getId();
+            }
+        }
+        if (osmId == null) {
+            osmId = poi.getId();
+        }
+
+        ImageSource imageSource = (poi.getSource() == LocationSource.OSM) ? ImageSource.OSM : null;
+
+        Map<String, String> tags = new HashMap<>();
+        if (poi.getConfidence() != null) {
+            tags.put("confidence", String.valueOf(poi.getConfidence()));
+        }
+
+        return new OsmPlace(
+                osmId,
+                poi.getName(),
+                categoryCode != null ? categoryCode : "OTHER",
+                poi.getAddress() != null ? poi.getAddress() : "Đang cập nhật địa chỉ",
+                poi.getLat() != null ? poi.getLat().doubleValue() : null,
+                poi.getLon() != null ? poi.getLon().doubleValue() : null,
+                null,
+                imageSource,
+                null,
+                null,
+                null,
+                tags
+        );
+    }
 
     /**
      * Maps an in-memory OsmPlace to a LocationResponse DTO.
