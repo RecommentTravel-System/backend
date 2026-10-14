@@ -51,12 +51,22 @@ public class Trip {
     @Column(name = "itinerary_arranged", nullable = false, columnDefinition = "boolean default false")
     Boolean itineraryArranged = false;
 
+    /** True when this trip has been paid / unlocked with a trip credit. */
+    @Builder.Default
+    @Column(name = "is_unlocked", nullable = false, columnDefinition = "boolean default false")
+    Boolean isUnlocked = false;
+
     @Builder.Default
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     Boolean deleted = false;
 
     @Column(name = "deleted_at")
     LocalDateTime deletedAt;
+
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    Long version = 0L;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

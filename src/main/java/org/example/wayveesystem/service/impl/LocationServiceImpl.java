@@ -4,7 +4,9 @@ import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.wayveesystem.common.client.OverpassApiClient;
-import org.example.wayveesystem.common.enums.ImageSource;
+
+import org.example.wayveesystem.common.enums.LocationSource;
+import org.example.wayveesystem.common.enums.PoiStatus;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.GridCacheKey;
@@ -13,8 +15,12 @@ import org.example.wayveesystem.dto.request.LocationFilterRequest;
 import org.example.wayveesystem.dto.response.*;
 import org.example.wayveesystem.mapper.OsmPlaceMapper;
 import org.example.wayveesystem.mapper.PlaceResponseMapper;
+import org.example.wayveesystem.model.Category;
+import org.example.wayveesystem.model.PoiCatalog;
+import org.example.wayveesystem.repository.CategoryRepository;
+import org.example.wayveesystem.repository.PoiCatalogRepository;
 import org.example.wayveesystem.repository.SavedPlaceRepository;
-import org.example.wayveesystem.service.ImageResolverService;
+
 import org.example.wayveesystem.service.LocationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
@@ -32,14 +38,20 @@ import java.util.concurrent.ExecutionException;
 public class LocationServiceImpl implements LocationService {
 
     private static final int MAX_GRID_RADIUS_METERS = 10000;
+    private static final long CATEGORY_CACHE_TTL_MS = 300_000L; // 5 mins
 
     private final OverpassApiClient overpassApiClient;
     private final RestClient nominatimRestClient;
     private final OsmPlaceMapper osmPlaceMapper;
     private final PlaceResponseMapper placeResponseMapper;
-    private final ImageResolverService imageResolverService;
+
     private final SavedPlaceRepository savedPlaceRepository;
+    private final PoiCatalogRepository poiCatalogRepository;
+    private final CategoryRepository categoryRepository;
     private final AsyncLoadingCache<GridCacheKey, List<OsmPlace>> poiAsyncLoadingCache;
+
+    private volatile Map<Long, String> cachedCategoryMap = null;
+    private volatile long lastCategoryLoadTime = 0L;
 
     @Value("${wayvee.cache.grid-precision:0.02}")
     private double gridPrecision;
@@ -50,13 +62,78 @@ public class LocationServiceImpl implements LocationService {
         double userLng = request.lng();
         int requestedRadius = request.radiusMeters() != null ? request.radiusMeters() : 1000;
 
-        double gridLat = GridCacheKey.snapToGrid(userLat, gridPrecision);
-        double gridLng = GridCacheKey.snapToGrid(userLng, gridPrecision);
-        GridCacheKey cacheKey = new GridCacheKey(gridLat, gridLng, MAX_GRID_RADIUS_METERS);
+        // 1. Ưu tiên tìm kiếm từ Database (poi_catalog) đã import
+        List<OsmPlace> dbPlaces = searchFromDatabase(request, userLat, userLng, requestedRadius);
 
-        List<OsmPlace> allGridPlaces = getFromCacheOrFetchAll(cacheKey);
+        List<OsmPlace> candidatePlaces;
+        if (!dbPlaces.isEmpty()) {
+            log.info("Found {} matching POIs in database for coords [{}, {}], radius={}m",
+                    dbPlaces.size(), userLat, userLng, requestedRadius);
+            candidatePlaces = dbPlaces;
+        } else {
+            // 2. Fallback: Nếu trong DB không có thì mới gọi Overpass API
+            log.info("No POIs found in database for coords [{}, {}]. Falling back to Overpass API cache/fetcher",
+                    userLat, userLng);
+            double gridLat = GridCacheKey.snapToGrid(userLat, gridPrecision);
+            double gridLng = GridCacheKey.snapToGrid(userLng, gridPrecision);
+            GridCacheKey cacheKey = new GridCacheKey(gridLat, gridLng, MAX_GRID_RADIUS_METERS);
 
-        List<OsmPlace> filteredPlaces = allGridPlaces.stream()
+            List<OsmPlace> allGridPlaces = getFromCacheOrFetchAll(cacheKey);
+
+            candidatePlaces = allGridPlaces.stream()
+                    .map(this::enrichPlaceData)
+                    .filter(place -> matchesDistance(place, userLat, userLng, requestedRadius))
+                    .filter(place -> matchesCategories(place, request.categories()))
+                    .filter(place -> matchesCuisines(place, request.cuisines()))
+                    .filter(place -> matchesMinRating(place, request.minRating()))
+                    .filter(place -> matchesKeyword(place, request.keyword()))
+                    .sorted(Comparator.comparingDouble(place -> calculateDistanceMeters(
+                            userLat, userLng, place.latitude(), place.longitude())))
+                    .toList();
+        }
+
+        int totalElements = candidatePlaces.size();
+        int fromIndex = Math.min(request.page() * request.size(), totalElements);
+        int toIndex = Math.min(fromIndex + request.size(), totalElements);
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / request.size());
+        List<LocationResponse> pageLocations = candidatePlaces.subList(fromIndex, toIndex).parallelStream()
+                .map(place -> placeResponseMapper.toResponse(place, userLat, userLng))
+                .toList();
+
+        return new LocationPageResponse(
+                pageLocations,
+                request.page(), request.size(), totalElements, totalPages
+        );
+    }
+
+    /**
+     * Tìm kiếm POI trong Database theo bounding box toạ độ, ánh xạ Category và áp dụng các bộ lọc.
+     */
+    private List<OsmPlace> searchFromDatabase(LocationFilterRequest request, double userLat, double userLng, int requestedRadius) {
+        double latDelta = requestedRadius / 111320.0;
+        double lngDelta = requestedRadius / (111320.0 * Math.max(0.0001, Math.cos(Math.toRadians(userLat))));
+
+        float minLat = (float) (userLat - latDelta);
+        float maxLat = (float) (userLat + latDelta);
+        float minLon = (float) (userLng - lngDelta);
+        float maxLon = (float) (userLng + lngDelta);
+
+        List<PoiCatalog> pois = poiCatalogRepository.findByLatBetweenAndLonBetweenAndStatus(
+                minLat, maxLat, minLon, maxLon, PoiStatus.ACTIVE
+        );
+
+        if (pois == null || pois.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> categoryMap = loadCategoryMap();
+
+        return pois.stream()
+                .map(poi -> {
+                    String categoryCode = poi.getCategoryId() != null ? categoryMap.getOrDefault(poi.getCategoryId(), "OTHER") : "OTHER";
+                    return placeResponseMapper.toOsmPlace(poi, categoryCode);
+                })
+                .filter(Objects::nonNull)
                 .map(this::enrichPlaceData)
                 .filter(place -> matchesDistance(place, userLat, userLng, requestedRadius))
                 .filter(place -> matchesCategories(place, request.categories()))
@@ -66,20 +143,22 @@ public class LocationServiceImpl implements LocationService {
                 .sorted(Comparator.comparingDouble(place -> calculateDistanceMeters(
                         userLat, userLng, place.latitude(), place.longitude())))
                 .toList();
+    }
 
-        int totalElements = filteredPlaces.size();
-        int fromIndex = Math.min(request.page() * request.size(), totalElements);
-        int toIndex = Math.min(fromIndex + request.size(), totalElements);
-        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / request.size());
-        List<LocationResponse> pageLocations = filteredPlaces.subList(fromIndex, toIndex).parallelStream()
-                .map(this::resolveImage)
-                .map(place -> placeResponseMapper.toResponse(place, userLat, userLng))
-                .toList();
-
-        return new LocationPageResponse(
-                pageLocations,
-                request.page(), request.size(), totalElements, totalPages
-        );
+    private Map<Long, String> loadCategoryMap() {
+        long now = System.currentTimeMillis();
+        if (cachedCategoryMap != null && (now - lastCategoryLoadTime) < CATEGORY_CACHE_TTL_MS) {
+            return cachedCategoryMap;
+        }
+        Map<Long, String> map = new HashMap<>();
+        for (Category cat : categoryRepository.findAll()) {
+            if (cat.getCategoryId() != null && cat.getCode() != null) {
+                map.put(cat.getCategoryId(), cat.getCode().toUpperCase());
+            }
+        }
+        cachedCategoryMap = map;
+        lastCategoryLoadTime = now;
+        return map;
     }
 
     /**
@@ -104,6 +183,27 @@ public class LocationServiceImpl implements LocationService {
 
     @Override
     public LocationResponse getPlaceByOsmId(Long osmId) {
+        if (osmId == null) {
+            throw new AppException(ErrorCode.LOCATION_NOT_FOUND);
+        }
+
+        // 1. Kiểm tra trong DB (poi_catalog) trước
+        Optional<PoiCatalog> poiOpt = poiCatalogRepository.findBySourceAndSourceId(LocationSource.OSM, String.valueOf(osmId));
+        if (poiOpt.isEmpty()) {
+            poiOpt = poiCatalogRepository.findById(osmId);
+        }
+
+        if (poiOpt.isPresent()) {
+            PoiCatalog poi = poiOpt.get();
+            Map<Long, String> categoryMap = loadCategoryMap();
+            String categoryCode = poi.getCategoryId() != null ? categoryMap.getOrDefault(poi.getCategoryId(), "OTHER") : "OTHER";
+            OsmPlace rawPlace = placeResponseMapper.toOsmPlace(poi, categoryCode);
+            if (rawPlace != null) {
+                return buildEnrichedPlaceResponse(rawPlace, osmId);
+            }
+        }
+
+        // 2. Nếu DB không có, fallback sang Overpass
         String query = String.format("[out:json][timeout:10];(node(%d);way(%d););out center qt 1;", osmId, osmId);
         OverpassResponse response = overpassApiClient.fetchSingleElement(query);
 
@@ -116,21 +216,12 @@ public class LocationServiceImpl implements LocationService {
             throw new AppException(ErrorCode.LOCATION_NOT_FOUND);
         }
 
+        return buildEnrichedPlaceResponse(rawPlace, osmId);
+    }
+
+    private LocationResponse buildEnrichedPlaceResponse(OsmPlace rawPlace, Long osmId) {
         OsmPlace enrichedPlace = enrichPlaceData(rawPlace);
-        var savedPlace = savedPlaceRepository.findByOsmId(osmId).orElse(null);
-        if (savedPlace != null && savedPlace.getImageUrl() != null && !savedPlace.getImageUrl().isBlank()) {
-            enrichedPlace = withImage(enrichedPlace, savedPlace.getImageUrl(), savedPlace.getImageSource());
-        } else {
-            var resolution = imageResolverService.resolve(enrichedPlace);
-            if (resolution.imageUrl() != null) {
-                enrichedPlace = withImage(enrichedPlace, resolution.imageUrl(), resolution.imageSource().name());
-                if (savedPlace != null) {
-                    savedPlace.setImageUrl(resolution.imageUrl());
-                    savedPlace.setImageSource(resolution.imageSource().name());
-                    savedPlaceRepository.save(savedPlace);
-                }
-            }
-        }
+        // Không cần resolve image nữa — FE sử dụng icon theo category
         return placeResponseMapper.toResponse(enrichedPlace, enrichedPlace.latitude(), enrichedPlace.longitude());
     }
 
@@ -201,22 +292,7 @@ public class LocationServiceImpl implements LocationService {
         );
     }
 
-    private OsmPlace withImage(OsmPlace place, String imageUrl, String source) {
-        ImageSource imageSource;
-        try { imageSource = source == null ? null : ImageSource.valueOf(source); }
-        catch (IllegalArgumentException ex) { imageSource = null; }
-        return new OsmPlace(place.osmId(), place.name(), place.categoryCode(), place.address(), place.latitude(),
-                place.longitude(), imageUrl, imageSource, place.openingHours(), place.phone(), place.website(), place.tags());
-    }
 
-    private OsmPlace resolveImage(OsmPlace place) {
-        if (place.imageUrl() != null && !place.imageUrl().isBlank()) {
-            return place;
-        }
-        var resolution = imageResolverService.resolve(place);
-        return resolution.imageUrl() == null ? place
-                : withImage(place, resolution.imageUrl(), resolution.imageSource().name());
-    }
 
     private boolean matchesDistance(OsmPlace place, double lat, double lng, int maxRadius) {
         if (place.latitude() == null || place.longitude() == null) return false;

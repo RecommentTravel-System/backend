@@ -25,5 +25,7 @@ public class SubscriptionResponse {
     LocalDateTime startDate;
     LocalDateTime endDate;
     SubscriptionStatus status;
+    Integer remainingTrips;
+    Integer totalTrips;
     LocalDateTime createdAt;
 }

@@ -20,6 +20,14 @@ public class SubscriptionMapper {
         LocalDateTime start = request.getStartDate() != null ? request.getStartDate() : LocalDateTime.now();
         SubscriptionStatus status = request.getStatus() != null ? request.getStatus() : SubscriptionStatus.ACTIVE;
 
+        int trips = request.getTotalTrips() != null ? request.getTotalTrips() : 1;
+        String pName = request.getPlanName() != null ? request.getPlanName().toLowerCase() : "";
+        if (request.getTotalTrips() == null) {
+            if (pName.contains("10") || pName.contains("ten")) trips = 10;
+            else if (pName.contains("2") || pName.contains("duo")) trips = 2;
+        }
+        int remTrips = request.getRemainingTrips() != null ? request.getRemainingTrips() : trips;
+
         return Subscription.builder()
                 .user(user)
                 .planName(request.getPlanName())
@@ -28,6 +36,8 @@ public class SubscriptionMapper {
                 .startDate(start)
                 .endDate(request.getEndDate())
                 .status(status)
+                .totalTrips(trips)
+                .remainingTrips(remTrips)
                 .build();
     }
 
@@ -46,6 +56,8 @@ public class SubscriptionMapper {
                 .startDate(subscription.getStartDate())
                 .endDate(subscription.getEndDate())
                 .status(subscription.getStatus())
+                .remainingTrips(subscription.getRemainingTrips())
+                .totalTrips(subscription.getTotalTrips())
                 .createdAt(subscription.getCreatedAt())
                 .build();
     }

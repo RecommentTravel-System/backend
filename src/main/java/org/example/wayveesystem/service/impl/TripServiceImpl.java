@@ -3,6 +3,7 @@ package org.example.wayveesystem.service.impl;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.enums.TripStatus;
 import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.request.TripRequest;
@@ -16,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -38,22 +40,41 @@ public class TripServiceImpl implements TripService {
                 .budget(request.getBudget())
                 .status(request.getStatus())
                 .itineraryArranged(Boolean.TRUE.equals(request.getItineraryArranged()))
+                .isUnlocked(Boolean.TRUE.equals(request.getIsUnlocked()))
                 .build();
         return toResponse(tripRepository.save(trip));
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<TripResponse> getMyTrips() {
-        return tripRepository.findByUserAndDeletedFalseOrderByCreatedAtDesc(getCurrentUser()).stream()
+        LocalDate today = LocalDate.now();
+        List<Trip> trips = tripRepository.findByUserAndDeletedFalseOrderByCreatedAtDesc(getCurrentUser());
+        for (Trip trip : trips) {
+            if (trip.getEndDate() != null && trip.getEndDate().isBefore(today)
+                    && trip.getStatus() != TripStatus.CANCELLED
+                    && trip.getStatus() != TripStatus.COMPLETED) {
+                trip.setStatus(TripStatus.COMPLETED);
+                tripRepository.save(trip);
+            }
+        }
+        return trips.stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public TripResponse getTripById(Long tripId) {
-        return toResponse(getActiveTrip(tripId));
+        Trip trip = getActiveTrip(tripId);
+        LocalDate today = LocalDate.now();
+        if (trip.getEndDate() != null && trip.getEndDate().isBefore(today)
+                && trip.getStatus() != TripStatus.CANCELLED
+                && trip.getStatus() != TripStatus.COMPLETED) {
+            trip.setStatus(TripStatus.COMPLETED);
+            trip = tripRepository.save(trip);
+        }
+        return toResponse(trip);
     }
 
     @Override
@@ -68,6 +89,9 @@ public class TripServiceImpl implements TripService {
         if (request.getItineraryArranged() != null) {
             trip.setItineraryArranged(request.getItineraryArranged());
         }
+        if (request.getIsUnlocked() != null) {
+            trip.setIsUnlocked(request.getIsUnlocked());
+        }
         return toResponse(tripRepository.save(trip));
     }
 
@@ -76,6 +100,14 @@ public class TripServiceImpl implements TripService {
     public TripResponse confirmItinerary(Long tripId) {
         Trip trip = getActiveTrip(tripId);
         trip.setItineraryArranged(true);
+        return toResponse(tripRepository.save(trip));
+    }
+
+    @Override
+    @Transactional
+    public TripResponse cancelTrip(Long tripId) {
+        Trip trip = getActiveTrip(tripId);
+        trip.setStatus(TripStatus.CANCELLED);
         return toResponse(tripRepository.save(trip));
     }
 
@@ -108,6 +140,7 @@ public class TripServiceImpl implements TripService {
                 .budget(trip.getBudget())
                 .status(trip.getStatus())
                 .itineraryArranged(trip.getItineraryArranged())
+                .isUnlocked(trip.getIsUnlocked())
                 .createdAt(trip.getCreatedAt())
                 .updatedAt(trip.getUpdatedAt())
                 .build();

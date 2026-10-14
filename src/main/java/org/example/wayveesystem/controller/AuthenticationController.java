@@ -117,4 +117,29 @@ public class AuthenticationController {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success("Password reset successfully"));
     }
+
+    @Operation(summary = "Lấy thông tin tài khoản hiện tại", description = "Lấy thông tin profile người dùng đang đăng nhập")
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> getMyProfile() {
+        UserResponse response = authenticationService.getMyProfile();
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("Get profile successful", response));
+    }
+
+    @Operation(summary = "Cập nhật ảnh đại diện", description = "Upload ảnh đại diện lên Cloudinary và lưu vào cơ sở dữ liệu")
+    @PostMapping(value = "/me/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<UserResponse>> updateAvatar(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        UserResponse response = authenticationService.updateAvatar(file);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("Update avatar successfully", response));
+    }
+
+    @Operation(summary = "Xóa ảnh đại diện", description = "Xóa avatar trên hệ thống và quay về ảnh đại diện mặc định")
+    @DeleteMapping("/me/avatar")
+    public ResponseEntity<ApiResponse<UserResponse>> removeAvatar() {
+        UserResponse response = authenticationService.removeAvatar();
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("Avatar removed successfully", response));
+    }
 }

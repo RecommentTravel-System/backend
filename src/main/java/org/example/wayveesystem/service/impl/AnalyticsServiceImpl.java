@@ -37,7 +37,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         // ── KPI totals ──────────────────────────────────────────────────────
         long totalUsers = userRepository.count();
         long totalTrips = tripRepository.count();
-        BigDecimal totalRevenue = paymentRepository.sumAmountByStatus(PaymentStatus.SUCCESS);
+        BigDecimal totalRevenue = paymentRepository.sumTotalRevenue();
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
 
         long activeSubscriptions = subscriptionRepository.findByStatus(SubscriptionStatus.ACTIVE).size();
@@ -45,7 +45,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         // ── KPI deltas for current period ───────────────────────────────────
         long newUsersThisPeriod = userRepository.countByCreatedAtAfter(from);
         long newTripsThisPeriod = tripRepository.countByCreatedAtAfter(from);
-        BigDecimal newRevenueThisPeriod = paymentRepository.sumAmountByStatusFrom(PaymentStatus.SUCCESS, from);
+        BigDecimal newRevenueThisPeriod = paymentRepository.sumTotalRevenueFrom(from);
         if (newRevenueThisPeriod == null) newRevenueThisPeriod = BigDecimal.ZERO;
 
         // ── Chart series ────────────────────────────────────────────────────

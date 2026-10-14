@@ -58,6 +58,37 @@ public class CloudinaryImageServiceImpl implements CloudinaryImageService {
         }
     }
 
+    @Override
+    public ImageUploadResponse uploadAvatar(MultipartFile file) {
+        validateImage(file);
+
+        try {
+            String folder = "wayvee/avatars";
+
+            Map<?, ?> result = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "folder", folder,
+                            "resource_type", "image"
+                    )
+            );
+
+            String secureUrl = (String) result.get("secure_url");
+            String publicId = (String) result.get("public_id");
+            if (secureUrl == null || publicId == null) {
+                throw new AppException(ErrorCode.IMAGE_UPLOAD_FAILED);
+            }
+
+            return new ImageUploadResponse(secureUrl, publicId);
+        } catch (IOException | RuntimeException exception) {
+            if (exception instanceof AppException appException) {
+                throw appException;
+            }
+            log.error("Cloudinary avatar upload failed", exception);
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
+
     private void validateImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.IMAGE_REQUIRED);

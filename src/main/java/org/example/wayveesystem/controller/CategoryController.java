@@ -19,7 +19,7 @@ import java.util.List;
 
 @Tag(name = "Category API", description = "Endpoints quản lý Danh mục địa điểm (Category CRUDS)")
 @RestController
-@RequestMapping("/api/v1/categories")
+@RequestMapping({"/api/v1/categories", "/api/categories"})
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class CategoryController {

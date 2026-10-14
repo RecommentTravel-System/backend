@@ -21,4 +21,7 @@ public interface AuthenticationService {
     void forgotPassword(OtpRequest request);
     ResetOtpResponse verifyResetOtp(VerifyEmailRequest request);
     void resetPassword(ResetPasswordRequest request) throws ParseException, JOSEException;
+    UserResponse updateAvatar(org.springframework.web.multipart.MultipartFile file);
+    UserResponse removeAvatar();
+    UserResponse getMyProfile();
 }

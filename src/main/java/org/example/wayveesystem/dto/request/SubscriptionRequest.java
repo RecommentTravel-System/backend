@@ -30,4 +30,8 @@ public class SubscriptionRequest {
     LocalDateTime endDate;
 
     SubscriptionStatus status;
+
+    Integer remainingTrips;
+
+    Integer totalTrips;
 }

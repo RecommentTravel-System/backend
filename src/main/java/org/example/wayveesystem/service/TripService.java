@@ -11,5 +11,6 @@ public interface TripService {
     TripResponse getTripById(Long tripId);
     TripResponse updateTrip(Long tripId, TripRequest request);
     TripResponse confirmItinerary(Long tripId);
+    TripResponse cancelTrip(Long tripId);
     void deleteTrip(Long tripId);
 }

@@ -20,7 +20,7 @@ public record LocationFilterRequest(
         Integer size
 ) {
     private static final int DEFAULT_PAGE_SIZE = 10;
-    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_PAGE_SIZE = 500;
 
     public LocationFilterRequest {
         if (radiusMeters == null || radiusMeters <= 0) {
