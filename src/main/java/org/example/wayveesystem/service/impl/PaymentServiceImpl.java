@@ -100,7 +100,8 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         long amountInt = subscription.getPrice().intValue();
-        String description = "Thanh toan " + payment.getPaymentId();
+        String description =
+                payment.getSubscription().getUser().getFullName() + " - " + payment.getSubscription().getPlanName();
 
         CreatePaymentLinkRequest paymentData = CreatePaymentLinkRequest.builder()
                 .orderCode(orderCode)
