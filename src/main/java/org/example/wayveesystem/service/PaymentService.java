@@ -1,7 +1,9 @@
 package org.example.wayveesystem.service;
 
+import org.example.wayveesystem.common.enums.PaymentStatus;
 import org.example.wayveesystem.dto.response.PaymentLinkResponse;
 import org.example.wayveesystem.dto.response.PaymentResponse;
+import org.example.wayveesystem.dto.response.PaymentSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import vn.payos.model.webhooks.Webhook;
@@ -50,4 +52,29 @@ public interface PaymentService {
      * @return Page<PaymentResponse> danh sách giao dịch
      */
     Page<PaymentResponse> getMyPayments(Pageable pageable);
+
+    /**
+     * Lấy danh sách tất cả các giao dịch thanh toán trong hệ thống cho Admin (có lọc và tìm kiếm).
+     *
+     * @param status Trạng thái thanh toán (tùy chọn)
+     * @param search Từ khóa tìm kiếm mã đơn, khách hàng, gói...
+     * @param pageable Thông tin phân trang
+     * @return Page<PaymentResponse>
+     */
+    Page<PaymentResponse> getAllPaymentsForAdmin(PaymentStatus status, String search, Pageable pageable);
+
+    /**
+     * Lấy báo cáo thống kê doanh thu và tỷ lệ chuyển tiền thành công / thất bại.
+     *
+     * @return PaymentSummaryResponse
+     */
+    PaymentSummaryResponse getPaymentSummary();
+
+    /**
+     * Đồng bộ trạng thái giao dịch trực tiếp từ PayOS cho một paymentId.
+     *
+     * @param paymentId ID của bản ghi Payment
+     * @return PaymentResponse
+     */
+    PaymentResponse syncPaymentWithPayOS(Long paymentId);
 }

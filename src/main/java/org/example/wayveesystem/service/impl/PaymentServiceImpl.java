@@ -13,6 +13,7 @@ import org.example.wayveesystem.common.exception.AppException;
 import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.response.PaymentLinkResponse;
 import org.example.wayveesystem.dto.response.PaymentResponse;
+import org.example.wayveesystem.dto.response.PaymentSummaryResponse;
 import org.example.wayveesystem.model.Payment;
 import org.example.wayveesystem.model.Subscription;
 import org.example.wayveesystem.model.User;
@@ -33,6 +34,8 @@ import vn.payos.model.webhooks.Webhook;
 import vn.payos.model.webhooks.WebhookData;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -265,12 +268,101 @@ public class PaymentServiceImpl implements PaymentService {
                 .map(this::toPaymentResponse);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PaymentResponse> getAllPaymentsForAdmin(PaymentStatus status, String search, Pageable pageable) {
+        String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        return paymentRepository.findAllForAdmin(status, cleanSearch, pageable)
+                .map(this::toPaymentResponse);
+    }
+
+    @Override
+    public PaymentSummaryResponse getPaymentSummary() {
+        BigDecimal totalRevenue = paymentRepository.sumTotalRevenue();
+        if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
+
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        BigDecimal todayRevenue = paymentRepository.sumTotalRevenueFrom(startOfToday);
+        if (todayRevenue == null) todayRevenue = BigDecimal.ZERO;
+
+        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        BigDecimal monthRevenue = paymentRepository.sumTotalRevenueFrom(startOfMonth);
+        if (monthRevenue == null) monthRevenue = BigDecimal.ZERO;
+
+        BigDecimal failedAmount = paymentRepository.sumFailedOrCancelledAmount();
+        if (failedAmount == null) failedAmount = BigDecimal.ZERO;
+
+        long totalCount = paymentRepository.count();
+        long successCount = paymentRepository.countByStatus(PaymentStatus.PAID)
+                + paymentRepository.countByStatus(PaymentStatus.SUCCESS);
+        long failedCount = paymentRepository.countByStatus(PaymentStatus.FAILED);
+        long cancelledCount = paymentRepository.countByStatus(PaymentStatus.CANCELLED);
+        long pendingCount = paymentRepository.countByStatus(PaymentStatus.PENDING);
+
+        double successRate = totalCount > 0 ? ((double) successCount / totalCount) * 100.0 : 0.0;
+        BigDecimal aov = successCount > 0
+                ? totalRevenue.divide(BigDecimal.valueOf(successCount), 0, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        return PaymentSummaryResponse.builder()
+                .totalRevenue(totalRevenue)
+                .todayRevenue(todayRevenue)
+                .monthRevenue(monthRevenue)
+                .failedAmount(failedAmount)
+                .totalCount(totalCount)
+                .successCount(successCount)
+                .failedCount(failedCount)
+                .cancelledCount(cancelledCount)
+                .pendingCount(pendingCount)
+                .successRate(Math.round(successRate * 10.0) / 10.0)
+                .averageOrderValue(aov)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse syncPaymentWithPayOS(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_NOT_FOUND));
+
+        try {
+            long orderCode = payment.getOrderCode() != null ? payment.getOrderCode() : payment.getPaymentId();
+            var paymentInfo = payOS.paymentRequests().get(orderCode);
+            if (paymentInfo != null && paymentInfo.getStatus() != null) {
+                String payOsStatus = paymentInfo.getStatus().name();
+                log.info("Direct sync for paymentId {} (orderCode {}): PayOS status is '{}'", paymentId, orderCode, payOsStatus);
+
+                if ("PAID".equalsIgnoreCase(payOsStatus)) {
+                    payment.setStatus(PaymentStatus.PAID);
+                    if (payment.getPaidAt() == null) {
+                        payment.setPaidAt(LocalDateTime.now());
+                    }
+                    paymentRepository.save(payment);
+                    activateSubscription(payment.getSubscription());
+                } else if ("CANCELLED".equalsIgnoreCase(payOsStatus)) {
+                    payment.setStatus(PaymentStatus.CANCELLED);
+                    paymentRepository.save(payment);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not sync PayOS status for paymentId {}: {}", paymentId, e.getMessage());
+        }
+
+        return toPaymentResponse(payment);
+    }
+
     private PaymentResponse toPaymentResponse(Payment payment) {
+        User user = null;
+        Subscription sub = payment.getSubscription();
+        if (sub != null) {
+            user = sub.getUser();
+        }
+
         return PaymentResponse.builder()
                 .paymentId(payment.getPaymentId())
                 .orderCode(payment.getOrderCode() != null ? payment.getOrderCode() : payment.getPaymentId())
-                .subscriptionId(payment.getSubscription() != null ? payment.getSubscription().getSubscriptionId() : null)
-                .planName(payment.getSubscription() != null ? payment.getSubscription().getPlanName() : null)
+                .subscriptionId(sub != null ? sub.getSubscriptionId() : null)
+                .planName(sub != null ? sub.getPlanName() : null)
                 .amount(payment.getAmount())
                 .paymentMethod(payment.getPaymentMethod())
                 .transactionCode(payment.getTransactionCode())
@@ -278,6 +370,11 @@ public class PaymentServiceImpl implements PaymentService {
                 .status(payment.getStatus())
                 .paidAt(payment.getPaidAt())
                 .createdAt(payment.getCreatedAt())
+                .userId(user != null ? user.getUserId() : null)
+                .userFullName(user != null ? user.getFullName() : null)
+                .userEmail(user != null ? user.getEmail() : null)
+                .userPhone(user != null ? user.getPhone() : null)
+                .userAvatarUrl(user != null ? user.getAvatarUrl() : null)
                 .build();
     }
 
