@@ -25,6 +25,7 @@ import java.text.ParseException;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@CrossOrigin(origins = "*")
 public class AuthenticationController {
 
     AuthenticationService authenticationService;

@@ -120,12 +120,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             user = userRepository.save(user);
             log.info("New Google user registered and saved to database: {}", email);
         } else {
-            validateUserStatus(user);
-
-            // Tự động kích hoạt tài khoản nếu đang ở trạng thái PENDING
+            // Tự động kích hoạt tài khoản nếu đang ở trạng thái PENDING (Google đã xác thực email)
             if (user.getStatus() == UserStatus.PENDING) {
                 user.setStatus(UserStatus.ACTIVE);
             }
+
+            validateUserStatus(user);
 
             // Cập nhật ảnh đại diện nếu user chưa có
             if ((user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) && request.getAvatarUrl() != null) {
