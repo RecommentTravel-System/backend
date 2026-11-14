@@ -3,6 +3,7 @@ package org.example.wayveesystem.model;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.enums.AuthProvider;
 import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 import org.hibernate.annotations.CreationTimestamp;
@@ -49,4 +50,9 @@ public class User {
 
     @Column(name = "avatar_url")
     String avatarUrl;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider")
+    AuthProvider authProvider = AuthProvider.LOCAL;
 }

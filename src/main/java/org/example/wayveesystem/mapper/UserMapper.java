@@ -1,5 +1,6 @@
 package org.example.wayveesystem.mapper;
 
+import org.example.wayveesystem.common.enums.AuthProvider;
 import org.example.wayveesystem.dto.request.UserCreationRequest;
 import org.example.wayveesystem.dto.response.UserResponse;
 import org.example.wayveesystem.model.User;
@@ -17,6 +18,7 @@ public class UserMapper {
                 .password(request.getPassword())
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
+                .authProvider(AuthProvider.LOCAL)
                 .build();
     }
 
@@ -33,6 +35,7 @@ public class UserMapper {
                 .status(user.getStatus())
                 .role(user.getRole())
                 .avatarUrl(user.getAvatarUrl())
+                .authProvider(user.getAuthProvider() != null ? user.getAuthProvider() : AuthProvider.LOCAL)
                 .build();
     }
 }

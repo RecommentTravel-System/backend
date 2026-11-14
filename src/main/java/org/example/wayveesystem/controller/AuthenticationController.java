@@ -45,6 +45,14 @@ public class AuthenticationController {
                 .body(ApiResponse.success("Login successful", response));
     }
 
+    @Operation(summary = "Đăng nhập bằng Google", description = "Xác thực tài khoản Google và lưu vào cơ sở dữ liệu nếu chưa tồn tại")
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<AuthenticationResponse>> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
+        AuthenticationResponse response = authenticationService.loginWithGoogle(request);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("Google login successful", response));
+    }
+
     @Operation(summary = "Đăng xuất", description = "Vô hiệu hóa Token hiện tại (Blacklist JWT)")
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@RequestBody LogoutRequest request) throws ParseException, JOSEException {

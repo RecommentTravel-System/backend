@@ -2,6 +2,7 @@ package org.example.wayveesystem.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.enums.AuthProvider;
 import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 
@@ -22,4 +23,5 @@ public class UserResponse {
     UserStatus status;
     Role role;
     String avatarUrl;
+    AuthProvider authProvider;
 }

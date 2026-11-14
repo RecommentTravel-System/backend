@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.example.wayveesystem.common.enums.AuthProvider;
 import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 import org.example.wayveesystem.model.User;
@@ -31,6 +32,7 @@ public class ApplicationInitConfig {
                         .phone("0123456789")
                         .role(Role.ADMIN)
                         .status(UserStatus.ACTIVE)
+                        .authProvider(AuthProvider.LOCAL)
                         .build();
                 userRepository.save(user);
                 log.warn("Admin has been created");
@@ -44,6 +46,7 @@ public class ApplicationInitConfig {
                         .phone("0987654321")
                         .role(Role.USER)
                         .status(UserStatus.ACTIVE)
+                        .authProvider(AuthProvider.LOCAL)
                         .build();
                 userRepository.save(user);
                 log.warn("Customer has been created");

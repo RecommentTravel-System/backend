@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.example.wayveesystem.common.enums.AuthProvider;
 import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 import org.example.wayveesystem.common.exception.AppException;
@@ -84,6 +85,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         User user = userMapper.toUser(request);
         user.setStatus(UserStatus.PENDING);
         user.setRole(Role.USER);
+        user.setAuthProvider(AuthProvider.LOCAL);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         User savedUser = userRepository.save(user);
 
@@ -91,6 +93,63 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         emailService.sendVerifyEmailOtp(savedUser.getEmail(), otp);
 
         return userMapper.toUserResponse(savedUser);
+    }
+
+    @Override
+    public AuthenticationResponse loginWithGoogle(GoogleLoginRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user == null) {
+            String fullName = request.getFullName();
+            if (fullName == null || fullName.isBlank()) {
+                fullName = email.split("@")[0];
+            }
+
+            user = User.builder()
+                    .email(email)
+                    .fullName(fullName)
+                    .avatarUrl(request.getAvatarUrl())
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .role(Role.USER)
+                    .status(UserStatus.ACTIVE)
+                    .authProvider(AuthProvider.GOOGLE)
+                    .build();
+
+            user = userRepository.save(user);
+            log.info("New Google user registered and saved to database: {}", email);
+        } else {
+            validateUserStatus(user);
+
+            // Tự động kích hoạt tài khoản nếu đang ở trạng thái PENDING
+            if (user.getStatus() == UserStatus.PENDING) {
+                user.setStatus(UserStatus.ACTIVE);
+            }
+
+            // Cập nhật ảnh đại diện nếu user chưa có
+            if ((user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) && request.getAvatarUrl() != null) {
+                user.setAvatarUrl(request.getAvatarUrl());
+            }
+
+            // Cập nhật authProvider nếu chưa được gán
+            if (user.getAuthProvider() == null) {
+                user.setAuthProvider(AuthProvider.GOOGLE);
+            }
+
+            user = userRepository.save(user);
+            log.info("Google user logged in: {}", email);
+        }
+
+        var accessToken = generateAccessToken(user);
+        var refreshToken = generateRefreshToken(user);
+
+        return AuthenticationResponse.builder()
+                .authenticated(true)
+                .userResponse(userMapper.toUserResponse(user))
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
     }
 
     @Override
