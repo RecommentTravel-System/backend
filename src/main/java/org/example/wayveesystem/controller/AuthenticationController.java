@@ -87,7 +87,7 @@ public class AuthenticationController {
                 .body(ApiResponse.success("OTP has been resent to your email"));
     }
 
-    @Operation(summary = "Thay đổi mật khẩu", description = "Thay đổi mật khẩu tài khoản đang đăng nhập")
+    @Operation(summary = "Thay Đổi mật khẩu", description = "Thay Đổi mật khẩu tài khoản đang đăng nhập")
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody PasswordUpdateRequest request) {
         authenticationService.changePassword(request);

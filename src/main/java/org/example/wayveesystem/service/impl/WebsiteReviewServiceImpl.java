@@ -39,6 +39,25 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
         }
     }
 
+    private boolean isAdmin() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated()) {
+                return false;
+            }
+            boolean hasAdminAuthority = auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority())
+                                || "ADMIN".equalsIgnoreCase(a.getAuthority()));
+            if (hasAdminAuthority) {
+                return true;
+            }
+            User currentUser = getCurrentUserOrNull();
+            return currentUser != null && currentUser.getRole() == org.example.wayveesystem.common.enums.Role.ADMIN;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public WebsiteReviewResponse createWebsiteReview(WebsiteReviewRequest request) {
         User currentUser = getCurrentUserOrNull();
@@ -76,9 +95,24 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
 
     @Override
     public List<WebsiteReviewResponse> getAllWebsiteReviews(Integer rating, String category, String keyword) {
-        List<WebsiteReview> list = (rating != null && rating > 0)
-                ? websiteReviewRepository.findByRatingOrderByCreatedAtDesc(rating)
-                : websiteReviewRepository.findAllByOrderByCreatedAtDesc();
+        List<WebsiteReview> list;
+        if (isAdmin()) {
+            // Admin có quyền xem tất cả đánh giá trang web từ mọi người dùng
+            list = (rating != null && rating > 0)
+                    ? websiteReviewRepository.findByRatingOrderByCreatedAtDesc(rating)
+                    : websiteReviewRepository.findAllByOrderByCreatedAtDesc();
+        } else {
+            // Người dùng thông thường: CHỈ xem được các đánh giá do chính mình viết
+            User currentUser = getCurrentUserOrNull();
+            if (currentUser == null) {
+                // Khách chưa đăng nhập: không xem đánh giá của người khác
+                return List.of();
+            }
+            list = websiteReviewRepository.findByUserOrEmail(currentUser.getUserId(), currentUser.getEmail());
+            if (rating != null && rating > 0) {
+                list = list.stream().filter(r -> r.getRating() != null && r.getRating().equals(rating)).toList();
+            }
+        }
 
         String kw = keyword != null ? keyword.trim().toLowerCase() : "";
         String cat = category != null ? category.trim().toLowerCase() : "";
@@ -104,25 +138,63 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
 
     @Override
     public WebsiteReviewStatsResponse getWebsiteReviewStats() {
-        long total = websiteReviewRepository.count();
-        Double avg = websiteReviewRepository.getAverageRating();
-        double averageRating = (avg != null && total > 0) ? Math.round(avg * 10.0) / 10.0 : 5.0;
+        if (isAdmin()) {
+            // Admin xem toàn bộ thống kê hệ thống
+            long total = websiteReviewRepository.count();
+            Double avg = websiteReviewRepository.getAverageRating();
+            double averageRating = (avg != null && total > 0) ? Math.round(avg * 10.0) / 10.0 : 5.0;
+
+            Map<Integer, Long> counts = new HashMap<>();
+            long positiveCount = 0;
+            for (int i = 1; i <= 5; i++) {
+                long c = websiteReviewRepository.countByRating(i);
+                counts.put(i, c);
+                if (i >= 4) {
+                    positiveCount += c;
+                }
+            }
+
+            double positivePercent = total > 0 ? Math.round(((double) positiveCount / total) * 1000.0) / 10.0 : 100.0;
+
+            return WebsiteReviewStatsResponse.builder()
+                    .totalReviews(total)
+                    .averageRating(averageRating)
+                    .ratingCounts(counts)
+                    .positivePercentage(positivePercent)
+                    .build();
+        }
+
+        // Người dùng thường: chỉ tính thống kê trên các đánh giá của chính mình
+        User currentUser = getCurrentUserOrNull();
+        if (currentUser == null) {
+            Map<Integer, Long> counts = new HashMap<>();
+            for (int i = 1; i <= 5; i++) counts.put(i, 0L);
+            return WebsiteReviewStatsResponse.builder()
+                    .totalReviews(0L)
+                    .averageRating(5.0)
+                    .ratingCounts(counts)
+                    .positivePercentage(100.0)
+                    .build();
+        }
+
+        List<WebsiteReview> myReviews = websiteReviewRepository.findByUserOrEmail(currentUser.getUserId(), currentUser.getEmail());
+        long total = myReviews.size();
+        double avg = total > 0 ? myReviews.stream().mapToInt(r -> r.getRating() != null ? r.getRating() : 5).average().orElse(5.0) : 5.0;
 
         Map<Integer, Long> counts = new HashMap<>();
         long positiveCount = 0;
         for (int i = 1; i <= 5; i++) {
-            long c = websiteReviewRepository.countByRating(i);
+            final int star = i;
+            long c = myReviews.stream().filter(r -> r.getRating() != null && r.getRating().equals(star)).count();
             counts.put(i, c);
-            if (i >= 4) {
-                positiveCount += c;
-            }
+            if (i >= 4) positiveCount += c;
         }
 
         double positivePercent = total > 0 ? Math.round(((double) positiveCount / total) * 1000.0) / 10.0 : 100.0;
 
         return WebsiteReviewStatsResponse.builder()
                 .totalReviews(total)
-                .averageRating(averageRating)
+                .averageRating(Math.round(avg * 10.0) / 10.0)
                 .ratingCounts(counts)
                 .positivePercentage(positivePercent)
                 .build();
@@ -134,7 +206,7 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
         if (currentUser == null) {
             return List.of();
         }
-        return websiteReviewRepository.findByUserUserIdOrderByCreatedAtDesc(currentUser.getUserId()).stream()
+        return websiteReviewRepository.findByUserOrEmail(currentUser.getUserId(), currentUser.getEmail()).stream()
                 .map(this::toResponse)
                 .toList();
     }
