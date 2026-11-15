@@ -35,8 +35,10 @@ import vn.payos.model.webhooks.WebhookData;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -103,8 +105,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         long amountInt = subscription.getPrice().intValue();
-        String description =
-                payment.getSubscription().getUser().getFullName() + " - " + payment.getSubscription().getPlanName();
+        String description = buildPayOsDescription(payment);
 
         CreatePaymentLinkRequest paymentData = CreatePaymentLinkRequest.builder()
                 .orderCode(orderCode)
@@ -118,7 +119,8 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             checkoutResponse = payOS.paymentRequests().create(paymentData);
         } catch (Exception e) {
-            log.error("Failed to create payOS payment link for orderCode: {} (paymentId: {})", orderCode, payment.getPaymentId(), e);
+            log.error("Failed to create payOS payment link for orderCode: {} (paymentId: {}) - Message: {}",
+                    orderCode, payment.getPaymentId(), e.getMessage(), e);
             payment.setStatus(PaymentStatus.FAILED);
             paymentRepository.save(payment);
             throw new AppException(ErrorCode.PAYMENT_CREATION_FAILED);
@@ -407,5 +409,30 @@ public class PaymentServiceImpl implements PaymentService {
         int currentRemaining = subscription.getRemainingTrips() != null ? subscription.getRemainingTrips() : 0;
         subscription.setRemainingTrips(Math.max(currentRemaining, tripsCount));
         subscriptionRepository.save(subscription);
+    }
+
+    private String buildPayOsDescription(Payment payment) {
+        String planName = payment.getSubscription() != null ? payment.getSubscription().getPlanName() : "";
+        String cleanPlan = removeAccents(planName).replaceAll("[^a-zA-Z0-9 ]", "").trim();
+        // PayOS quy định description tối đa 25 ký tự, không chứa dấu tiếng Việt hoặc ký tự đặc biệt
+        String prefix = "WV " + payment.getPaymentId() + " ";
+        int maxPlanLen = Math.max(0, 25 - prefix.length());
+        if (cleanPlan.length() > maxPlanLen) {
+            cleanPlan = cleanPlan.substring(0, maxPlanLen).trim();
+        }
+        String desc = (prefix + cleanPlan).trim();
+        if (desc.length() > 25) {
+            desc = desc.substring(0, 25).trim();
+        }
+        return desc;
+    }
+
+    private String removeAccents(String input) {
+        if (input == null) return "";
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        return pattern.matcher(normalized).replaceAll("")
+                .replace("đ", "d")
+                .replace("Đ", "D");
     }
 }
