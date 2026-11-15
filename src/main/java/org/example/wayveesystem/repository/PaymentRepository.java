@@ -59,4 +59,34 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             "GROUP BY FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'month', p.paidAt) " +
             "ORDER BY FUNCTION('date_part', 'year', p.paidAt), FUNCTION('date_part', 'month', p.paidAt)")
     List<Object[]> revenueGroupedByMonth(@Param("from") LocalDateTime from);
+
+    long countByStatus(PaymentStatus status);
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.status = 'FAILED' OR p.status = 'CANCELLED'")
+    BigDecimal sumFailedOrCancelledAmount();
+
+    @Query(value = "SELECT p FROM Payment p " +
+            "LEFT JOIN FETCH p.subscription s " +
+            "LEFT JOIN FETCH s.user u " +
+            "WHERE (:status IS NULL OR p.status = :status) " +
+            "AND (:search IS NULL OR :search = '' OR " +
+            "     CONCAT('', p.orderCode) LIKE CONCAT('%', :search, '%') OR " +
+            "     LOWER(p.transactionCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "     LOWER(s.planName) LIKE LOWER(CONCAT('%', :search, '%')))",
+            countQuery = "SELECT COUNT(p) FROM Payment p " +
+            "LEFT JOIN p.subscription s " +
+            "LEFT JOIN s.user u " +
+            "WHERE (:status IS NULL OR p.status = :status) " +
+            "AND (:search IS NULL OR :search = '' OR " +
+            "     CONCAT('', p.orderCode) LIKE CONCAT('%', :search, '%') OR " +
+            "     LOWER(p.transactionCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "     LOWER(s.planName) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Payment> findAllForAdmin(
+            @Param("status") PaymentStatus status,
+            @Param("search") String search,
+            Pageable pageable);
 }

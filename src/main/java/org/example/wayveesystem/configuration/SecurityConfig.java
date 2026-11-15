@@ -10,6 +10,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -32,6 +34,9 @@ public class SecurityConfig {
             "/api/v1/categories",
             "/api/v1/categories/**",
             "/api/reviews/**",
+            "/api/v1/reviews/**",
+            "/api/website-reviews/**",
+            "/api/v1/website-reviews/**",
             "/api/favorites/**",
             "/api/subscriptions/**",
             "/api/v1/trips/**",
@@ -57,6 +62,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
+                .bearerTokenResolver(bearerTokenResolver())
                 .jwt(jwt -> jwt
                     .decoder(customJwtDecoder)
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
@@ -65,6 +71,19 @@ public class SecurityConfig {
             );
 
         return http.build();
+    }
+
+    @Bean
+    public BearerTokenResolver bearerTokenResolver() {
+        DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
+        return request -> {
+            String uri = request.getRequestURI();
+            // Do not resolve or require Bearer token for public auth endpoints (except /me)
+            if (uri.contains("/api/auth/") && !uri.contains("/api/auth/me")) {
+                return null;
+            }
+            return defaultResolver.resolve(request);
+        };
     }
 
     /**

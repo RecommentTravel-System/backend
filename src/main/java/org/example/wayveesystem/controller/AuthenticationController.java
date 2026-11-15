@@ -25,6 +25,7 @@ import java.text.ParseException;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@CrossOrigin(origins = "*")
 public class AuthenticationController {
 
     AuthenticationService authenticationService;
@@ -43,6 +44,14 @@ public class AuthenticationController {
         AuthenticationResponse response = authenticationService.authenticate(request);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success("Login successful", response));
+    }
+
+    @Operation(summary = "Đăng nhập bằng Google", description = "Xác thực tài khoản Google và lưu vào cơ sở dữ liệu nếu chưa tồn tại")
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<AuthenticationResponse>> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
+        AuthenticationResponse response = authenticationService.loginWithGoogle(request);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("Google login successful", response));
     }
 
     @Operation(summary = "Đăng xuất", description = "Vô hiệu hóa Token hiện tại (Blacklist JWT)")
@@ -87,7 +96,7 @@ public class AuthenticationController {
                 .body(ApiResponse.success("OTP has been resent to your email"));
     }
 
-    @Operation(summary = "Thay đổi mật khẩu", description = "Thay đổi mật khẩu tài khoản đang đăng nhập")
+    @Operation(summary = "Thay Đổi mật khẩu", description = "Thay Đổi mật khẩu tài khoản đang đăng nhập")
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody PasswordUpdateRequest request) {
         authenticationService.changePassword(request);

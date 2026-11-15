@@ -26,4 +26,10 @@ public class PaymentResponse {
     PaymentStatus status;
     LocalDateTime paidAt;
     LocalDateTime createdAt;
+
+    Long userId;
+    String userFullName;
+    String userEmail;
+    String userPhone;
+    String userAvatarUrl;
 }

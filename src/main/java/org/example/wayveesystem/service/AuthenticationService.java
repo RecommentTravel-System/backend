@@ -12,6 +12,7 @@ import java.text.ParseException;
 public interface AuthenticationService {
     UserResponse createUserAccount(UserCreationRequest request);
     AuthenticationResponse authenticate(AuthenticationRequest request);
+    AuthenticationResponse loginWithGoogle(GoogleLoginRequest request);
     void logout(LogoutRequest request) throws ParseException, JOSEException;
     IntrospectResponse introspect(IntrospectRequest request) throws JOSEException, ParseException;
     AuthenticationResponse refreshToken(RefreshTokenRequest request) throws ParseException, JOSEException;

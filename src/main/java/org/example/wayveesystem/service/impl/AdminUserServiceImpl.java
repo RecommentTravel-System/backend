@@ -3,6 +3,7 @@ package org.example.wayveesystem.service.impl;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.enums.AuthProvider;
 import org.example.wayveesystem.common.enums.Role;
 import org.example.wayveesystem.common.enums.UserStatus;
 import org.example.wayveesystem.common.exception.AppException;
@@ -49,6 +50,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         User user = userMapper.toUser(request);
         user.setStatus(UserStatus.ACTIVE);
         user.setRole(Role.USER);
+        user.setAuthProvider(AuthProvider.LOCAL);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         return userMapper.toUserResponse(userRepository.save(user));
     }
