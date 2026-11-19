@@ -45,6 +45,11 @@ public enum ErrorCode {
     INVALID_IMAGE_TYPE(4012, "Only image files are supported", HttpStatus.BAD_REQUEST),
     IMAGE_TOO_LARGE(4013, "Image size must not exceed 10 MB", HttpStatus.PAYLOAD_TOO_LARGE),
     IMAGE_UPLOAD_FAILED(4014, "Failed to upload image", HttpStatus.INTERNAL_SERVER_ERROR),
+    MEDIA_REQUIRED(4030, "Tệp đính kèm không được để trống", HttpStatus.BAD_REQUEST),
+    INVALID_MEDIA_TYPE(4031, "Chỉ hỗ trợ định dạng hình ảnh hoặc video", HttpStatus.BAD_REQUEST),
+    MEDIA_TOO_LARGE(4032, "Dung lượng tệp không được vượt quá 30 MB", HttpStatus.PAYLOAD_TOO_LARGE),
+    MEDIA_UPLOAD_FAILED(4033, "Tải tệp đa phương tiện lên thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    WEBSITE_REVIEW_NOT_FOUND(4034, "Không tìm thấy đánh giá trang web", HttpStatus.NOT_FOUND),
 
     CATEGORY_NOT_FOUND(4004, "Category not found", HttpStatus.NOT_FOUND),
     CATEGORY_CODE_EXISTED(4005, "Category code already exists", HttpStatus.BAD_REQUEST),

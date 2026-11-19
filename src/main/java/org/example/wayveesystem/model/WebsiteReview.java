@@ -6,6 +6,8 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "website_reviews")
@@ -44,6 +46,21 @@ public class WebsiteReview {
     @Column(name = "anonymous")
     @Builder.Default
     Boolean anonymous = false;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "website_review_media", joinColumns = @JoinColumn(name = "review_id"))
+    @Column(name = "media_url", length = 1000)
+    @Builder.Default
+    List<String> mediaUrls = new ArrayList<>();
+
+    @Column(name = "admin_reply", columnDefinition = "TEXT")
+    String adminReply;
+
+    @Column(name = "replied_at")
+    LocalDateTime repliedAt;
+
+    @Column(name = "replied_by")
+    String repliedBy;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

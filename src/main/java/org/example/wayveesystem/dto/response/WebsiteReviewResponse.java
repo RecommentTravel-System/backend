@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -20,6 +21,10 @@ public class WebsiteReviewResponse {
     String category;
     String comment;
     Boolean anonymous;
+    List<String> mediaUrls;
+    String adminReply;
+    LocalDateTime repliedAt;
+    String repliedBy;
     LocalDateTime createdAt;
 }
 

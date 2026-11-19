@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -29,5 +31,7 @@ public class WebsiteReviewRequest {
     String userEmail;
 
     Boolean anonymous;
+
+    List<String> mediaUrls;
 }
 

@@ -3,18 +3,25 @@ package org.example.wayveesystem.service.impl;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.example.wayveesystem.common.exception.AppException;
+import org.example.wayveesystem.common.exception.ErrorCode;
 import org.example.wayveesystem.dto.request.WebsiteReviewRequest;
+import org.example.wayveesystem.dto.response.ImageUploadResponse;
 import org.example.wayveesystem.dto.response.WebsiteReviewResponse;
 import org.example.wayveesystem.dto.response.WebsiteReviewStatsResponse;
 import org.example.wayveesystem.model.User;
 import org.example.wayveesystem.model.WebsiteReview;
 import org.example.wayveesystem.repository.UserRepository;
 import org.example.wayveesystem.repository.WebsiteReviewRepository;
+import org.example.wayveesystem.service.CloudinaryImageService;
 import org.example.wayveesystem.service.WebsiteReviewService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +33,7 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
 
     WebsiteReviewRepository websiteReviewRepository;
     UserRepository userRepository;
+    CloudinaryImageService cloudinaryImageService;
 
     private User getCurrentUserOrNull() {
         try {
@@ -79,6 +87,8 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
             fullName = isAnonymous ? "Người dùng ẩn danh" : "Khách tham quan";
         }
 
+        List<String> media = request.getMediaUrls() != null ? new ArrayList<>(request.getMediaUrls()) : new ArrayList<>();
+
         WebsiteReview review = WebsiteReview.builder()
                 .user(currentUser)
                 .userFullName(fullName)
@@ -87,6 +97,7 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
                 .category(request.getCategory() != null && !request.getCategory().isBlank() ? request.getCategory() : "Trải nghiệm chung")
                 .comment(request.getComment() != null ? request.getComment().trim() : "")
                 .anonymous(isAnonymous)
+                .mediaUrls(media)
                 .build();
 
         WebsiteReview saved = websiteReviewRepository.save(review);
@@ -211,6 +222,50 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
                 .toList();
     }
 
+    @Override
+    public WebsiteReviewResponse replyWebsiteReview(Long id, String reply) {
+        if (!isAdmin()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        WebsiteReview review = websiteReviewRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.WEBSITE_REVIEW_NOT_FOUND));
+
+        User currentUser = getCurrentUserOrNull();
+        String adminName = (currentUser != null && currentUser.getFullName() != null && !currentUser.getFullName().isBlank())
+                ? currentUser.getFullName()
+                : "Ban Quản Trị WAYVEE";
+
+        review.setAdminReply(reply != null ? reply.trim() : "");
+        review.setRepliedAt(LocalDateTime.now());
+        review.setRepliedBy(adminName);
+
+        WebsiteReview saved = websiteReviewRepository.save(review);
+        return toResponse(saved);
+    }
+
+    @Override
+    public WebsiteReviewResponse deleteReply(Long id) {
+        if (!isAdmin()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        WebsiteReview review = websiteReviewRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.WEBSITE_REVIEW_NOT_FOUND));
+
+        review.setAdminReply(null);
+        review.setRepliedAt(null);
+        review.setRepliedBy(null);
+
+        WebsiteReview saved = websiteReviewRepository.save(review);
+        return toResponse(saved);
+    }
+
+    @Override
+    public ImageUploadResponse uploadMedia(MultipartFile file) {
+        return cloudinaryImageService.uploadFeedbackMedia(file);
+    }
+
     private WebsiteReviewResponse toResponse(WebsiteReview r) {
         String displayName = r.getUserFullName();
         String displayEmail = r.getUserEmail();
@@ -228,6 +283,10 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
                 .category(r.getCategory())
                 .comment(r.getComment())
                 .anonymous(r.getAnonymous())
+                .mediaUrls(r.getMediaUrls() != null ? new ArrayList<>(r.getMediaUrls()) : new ArrayList<>())
+                .adminReply(r.getAdminReply())
+                .repliedAt(r.getRepliedAt())
+                .repliedBy(r.getRepliedBy())
                 .createdAt(r.getCreatedAt())
                 .build();
     }

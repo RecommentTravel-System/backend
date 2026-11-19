@@ -89,6 +89,50 @@ public class CloudinaryImageServiceImpl implements CloudinaryImageService {
         }
     }
 
+    @Override
+    public ImageUploadResponse uploadFeedbackMedia(MultipartFile file) {
+        validateMedia(file);
+
+        try {
+            String folder = "wayvee/feedback";
+
+            Map<?, ?> result = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "folder", folder,
+                            "resource_type", "auto"
+                    )
+            );
+
+            String secureUrl = (String) result.get("secure_url");
+            String publicId = (String) result.get("public_id");
+            if (secureUrl == null || publicId == null) {
+                throw new AppException(ErrorCode.MEDIA_UPLOAD_FAILED);
+            }
+
+            return new ImageUploadResponse(secureUrl, publicId);
+        } catch (IOException | RuntimeException exception) {
+            if (exception instanceof AppException appException) {
+                throw appException;
+            }
+            log.error("Cloudinary feedback media upload failed", exception);
+            throw new AppException(ErrorCode.MEDIA_UPLOAD_FAILED);
+        }
+    }
+
+    private void validateMedia(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException(ErrorCode.MEDIA_REQUIRED);
+        }
+        if (file.getSize() > 30 * 1024 * 1024) {
+            throw new AppException(ErrorCode.MEDIA_TOO_LARGE);
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.startsWith("image/") && !contentType.startsWith("video/"))) {
+            throw new AppException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+    }
+
     private void validateImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.IMAGE_REQUIRED);

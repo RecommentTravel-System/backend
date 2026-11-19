@@ -98,7 +98,7 @@ flowchart TD
 | `CategoryController` | `/api/categories`, `/api/v1/categories` | CRUD danh mục POI |
 | `FavoriteController` | `/api/favorites` | Thêm/xóa địa điểm yêu thích |
 | `ReviewController` | `/api/reviews`, `/api/v1/reviews` | CRUD reviews cho địa điểm |
-| `WebsiteReviewController` | `/api/website-reviews`, `/api/v1/website-reviews` | Reviews về website Wayvee |
+| `WebsiteReviewController` | `/api/website-reviews`, `/api/v1/website-reviews` | Gửi đánh giá website kèm ảnh/video, upload media lên Cloudinary, thống kê, Admin phản hồi (reply) & xóa phản hồi |
 | `TripController` | `/api/trips`, `/api/v1/trips` | CRUD trips của user |
 | `TripReplanningController` | `/api/trips/replan` | Preview & confirm trip replanning |
 | `SubscriptionController` | `/api/subscriptions` | Quản lý gói Premium |
@@ -121,7 +121,7 @@ flowchart TD
 | `Category` | Danh mục địa điểm | id, code (CategoryCode enum), name, icon |
 | `Favorite` | Địa điểm yêu thích | id, userId, locationId |
 | `Review` | Đánh giá địa điểm | id, userId, locationId, rating, comment |
-| `WebsiteReview` | Đánh giá website | id, userId, rating, comment |
+| `WebsiteReview` | Đánh giá website từ người dùng | id, userId, rating, category, comment, mediaUrls (ảnh/video Cloudinary), adminReply, repliedAt, repliedBy, anonymous, createdAt |
 | `Subscription` | Gói subscription | id, userId, planType, status, startDate, endDate |
 | `Payment` | Thanh toán | id, userId, subscriptionId, method, status, amount |
 | `InvalidatedToken` | Token đã logout | id (jti), expiryTime |
