@@ -122,6 +122,7 @@ flowchart TD
 | `Favorite` | Địa điểm yêu thích | id, userId, locationId |
 | `Review` | Đánh giá địa điểm | id, userId, locationId, rating, comment |
 | `WebsiteReview` | Đánh giá website từ người dùng | id, userId, rating, category, comment, mediaUrls (ảnh/video Cloudinary), adminReply, repliedAt, repliedBy, anonymous, createdAt |
+| `AccessLog` | Nhật ký truy cập & lưu lượng | id, ipAddress, path, pageTitle, deviceType, browser, operatingSystem, userAgent, userId, userEmail, userFullName, statusCode, createdAt |
 | `Subscription` | Gói subscription | id, userId, planType, status, startDate, endDate |
 | `Payment` | Thanh toán | id, userId, subscriptionId, method, status, amount |
 | `InvalidatedToken` | Token đã logout | id (jti), expiryTime |

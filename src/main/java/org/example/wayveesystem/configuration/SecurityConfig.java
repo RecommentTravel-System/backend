@@ -37,6 +37,8 @@ public class SecurityConfig {
             "/api/v1/reviews/**",
             "/api/website-reviews/**",
             "/api/v1/website-reviews/**",
+            "/api/access-logs/**",
+            "/api/v1/access-logs/**",
             "/api/favorites/**",
             "/api/subscriptions/**",
             "/api/v1/trips/**",
