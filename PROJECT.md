@@ -99,6 +99,7 @@ Wayvee/
 | **Media** | Cloudinary HTTP5 SDK | Tự động phân loại ảnh và video (`resource_type=auto`) |
 | **Bản đồ** | OpenStreetMap (Overpass API + Nominatim Reverse) | Tìm kiếm POI, địa chỉ |
 | **Email** | Spring Mail, Resend SDK, Thymeleaf | Gửi mã OTP kích hoạt & khôi phục |
+| **PWA & Desktop App** | W3C Web App Manifest, Service Worker, PWABuilder | Sẵn sàng đóng gói MSIX đưa lên Microsoft Store, hỗ trợ ngoại tuyến, bộ icon đa kích thước & screenshots |
 | **Deploy FE** | Vercel | CI/CD từ nhánh `main` |
 | **Deploy BE** | Docker / Render / VPS | CI/CD từ nhánh `dev` |
 
