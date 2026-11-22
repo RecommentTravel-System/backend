@@ -11,7 +11,10 @@ import org.example.wayveesystem.dto.response.AccessLogResponse;
 import org.example.wayveesystem.dto.response.TrafficStatsResponse;
 import org.example.wayveesystem.model.AccessLog;
 import org.example.wayveesystem.repository.AccessLogRepository;
+import org.example.wayveesystem.repository.UserRepository;
 import org.example.wayveesystem.service.AccessLogService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +36,7 @@ import java.util.List;
 public class AccessLogServiceImpl implements AccessLogService {
 
     AccessLogRepository accessLogRepository;
+    UserRepository userRepository;
 
     @Override
     @Transactional
@@ -63,6 +67,41 @@ public class AccessLogServiceImpl implements AccessLogService {
             path = "/";
         }
 
+        Long userId = request.getUserId();
+        String userEmail = request.getUserEmail();
+        String userFullName = request.getUserFullName();
+
+        // Tự động gán thông tin người dùng từ SecurityContext nếu chưa có trong request
+        if (userId == null || userEmail == null) {
+            try {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                    String principalName = auth.getName();
+                    if (principalName != null && !principalName.isBlank()) {
+                        var userOpt = userRepository.findByEmail(principalName);
+                        if (userOpt.isPresent()) {
+                            var u = userOpt.get();
+                            if (userId == null) userId = u.getUserId();
+                            if (userEmail == null) userEmail = u.getEmail();
+                            if (userFullName == null) userFullName = u.getFullName();
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Nếu truy cập các trang quản trị /admin mà chưa có user, gán với tài khoản Admin hệ thống
+        if ((userId == null || userEmail == null) && path.startsWith("/admin")) {
+            var adminOpt = userRepository.findByEmail("admin@gmail.com");
+            if (adminOpt.isPresent()) {
+                var admin = adminOpt.get();
+                if (userId == null) userId = admin.getUserId();
+                if (userEmail == null) userEmail = admin.getEmail();
+                if (userFullName == null) userFullName = admin.getFullName();
+            }
+        }
+
         AccessLog logEntry = AccessLog.builder()
                 .ipAddress(clientIp)
                 .path(path)
@@ -72,9 +111,9 @@ public class AccessLogServiceImpl implements AccessLogService {
                 .browser(browser)
                 .operatingSystem(os)
                 .userAgent(userAgent)
-                .userId(request.getUserId())
-                .userEmail(request.getUserEmail())
-                .userFullName(request.getUserFullName())
+                .userId(userId)
+                .userEmail(userEmail)
+                .userFullName(userFullName)
                 .statusCode(200)
                 .build();
 
