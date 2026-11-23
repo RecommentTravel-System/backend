@@ -13,12 +13,15 @@ import org.example.wayveesystem.dto.request.UserCreationRequest;
 import org.example.wayveesystem.dto.response.UserResponse;
 import org.example.wayveesystem.mapper.UserMapper;
 import org.example.wayveesystem.model.User;
+import org.example.wayveesystem.repository.TripRepository;
 import org.example.wayveesystem.repository.UserRepository;
 import org.example.wayveesystem.service.AdminUserService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,19 +29,35 @@ import java.util.List;
 public class AdminUserServiceImpl implements AdminUserService {
 
     UserRepository userRepository;
+    TripRepository tripRepository;
     UserMapper userMapper;
     PasswordEncoder passwordEncoder;
 
     @Override
     public List<UserResponse> getAllUsers() {
+        Map<Long, Long> completedTripsByUser = tripRepository.countCompletedTripsGroupedByUser().stream()
+                .filter(row -> row[0] != null && row[1] != null)
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1],
+                        (existing, replacement) -> existing
+                ));
+
         return userRepository.findAll().stream()
-                .map(userMapper::toUserResponse)
+                .map(u -> {
+                    UserResponse resp = userMapper.toUserResponse(u);
+                    resp.setTripsCompleted(completedTripsByUser.getOrDefault(u.getUserId(), 0L));
+                    return resp;
+                })
                 .toList();
     }
 
     @Override
     public UserResponse getUserById(Long userId) {
-        return userMapper.toUserResponse(findUserById(userId));
+        User user = findUserById(userId);
+        UserResponse resp = userMapper.toUserResponse(user);
+        resp.setTripsCompleted(tripRepository.countByUserAndStatusAndDeletedFalse(user, org.example.wayveesystem.common.enums.TripStatus.COMPLETED));
+        return resp;
     }
 
     @Override

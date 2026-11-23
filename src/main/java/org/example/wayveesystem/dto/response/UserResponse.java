@@ -24,4 +24,5 @@ public class UserResponse {
     Role role;
     String avatarUrl;
     AuthProvider authProvider;
+    Long tripsCompleted;
 }

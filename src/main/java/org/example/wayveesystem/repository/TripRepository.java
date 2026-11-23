@@ -17,6 +17,11 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
 
     Optional<Trip> findByTripIdAndUserAndDeletedFalse(Long tripId, User user);
 
+    long countByUserAndStatusAndDeletedFalse(User user, org.example.wayveesystem.common.enums.TripStatus status);
+
+    @Query("SELECT t.user.userId, COUNT(t) FROM Trip t WHERE t.status = org.example.wayveesystem.common.enums.TripStatus.COMPLETED AND t.deleted = false GROUP BY t.user.userId")
+    List<Object[]> countCompletedTripsGroupedByUser();
+
     long countByCreatedAtAfter(LocalDateTime from);
 
     // Group trips by day
