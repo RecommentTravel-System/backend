@@ -40,6 +40,22 @@ public class WebsiteReviewController {
                 .body(ApiResponse.success("Đánh giá trang web đã được gửi thành công", response));
     }
 
+    @Operation(summary = "Chỉnh sửa đánh giá trang web", description = "Chỉ người dùng đã gửi đánh giá mới có quyền chỉnh sửa đánh giá của chính mình")
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<WebsiteReviewResponse>> updateReview(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody WebsiteReviewRequest request) {
+        WebsiteReviewResponse response = websiteReviewService.updateWebsiteReview(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Chỉnh sửa đánh giá thành công", response));
+    }
+
+    @Operation(summary = "Xóa đánh giá trang web", description = "Chỉ người dùng đã gửi đánh giá mới có quyền xóa đánh giá của chính mình")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteReview(@PathVariable("id") Long id) {
+        websiteReviewService.deleteWebsiteReview(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa đánh giá thành công", null));
+    }
+
     @Operation(summary = "Tải lên ảnh hoặc video cho feedback", description = "Tải lên tệp ảnh hoặc video đính kèm cho đánh giá trang web lên Cloudinary")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadMedia(@RequestParam("file") MultipartFile file) {
@@ -90,4 +106,3 @@ public class WebsiteReviewController {
         return ResponseEntity.ok(ApiResponse.success("Lấy đánh giá cá nhân thành công", list));
     }
 }
-

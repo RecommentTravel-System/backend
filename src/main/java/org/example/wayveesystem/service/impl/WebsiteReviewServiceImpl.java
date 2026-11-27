@@ -105,6 +105,65 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
     }
 
     @Override
+    public WebsiteReviewResponse updateWebsiteReview(Long id, WebsiteReviewRequest request) {
+        WebsiteReview review = websiteReviewRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.WEBSITE_REVIEW_NOT_FOUND));
+
+        User currentUser = getCurrentUserOrNull();
+        if (currentUser == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        // Chỉ chính người dùng tạo đánh giá mới có quyền chỉnh sửa
+        boolean isOwner = (review.getUser() != null && review.getUser().getUserId().equals(currentUser.getUserId()))
+                       || (currentUser.getEmail() != null && currentUser.getEmail().equalsIgnoreCase(review.getUserEmail()));
+
+        if (!isOwner) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (request.getRating() != null) {
+            review.setRating(request.getRating());
+        }
+        if (request.getCategory() != null && !request.getCategory().isBlank()) {
+            review.setCategory(request.getCategory());
+        }
+        if (request.getComment() != null) {
+            review.setComment(request.getComment().trim());
+        }
+        if (request.getAnonymous() != null) {
+            review.setAnonymous(request.getAnonymous());
+        }
+        if (request.getMediaUrls() != null) {
+            review.setMediaUrls(new ArrayList<>(request.getMediaUrls()));
+        }
+
+        WebsiteReview saved = websiteReviewRepository.save(review);
+        return toResponse(saved);
+    }
+
+    @Override
+    public void deleteWebsiteReview(Long id) {
+        WebsiteReview review = websiteReviewRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.WEBSITE_REVIEW_NOT_FOUND));
+
+        User currentUser = getCurrentUserOrNull();
+        if (currentUser == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        // Chỉ chính người dùng tạo đánh giá mới có quyền xóa
+        boolean isOwner = (review.getUser() != null && review.getUser().getUserId().equals(currentUser.getUserId()))
+                       || (currentUser.getEmail() != null && currentUser.getEmail().equalsIgnoreCase(review.getUserEmail()));
+
+        if (!isOwner) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        websiteReviewRepository.delete(review);
+    }
+
+    @Override
     public List<WebsiteReviewResponse> getAllWebsiteReviews(Integer rating, String category, String keyword) {
         List<WebsiteReview> list;
         if (isAdmin()) {
@@ -291,4 +350,3 @@ public class WebsiteReviewServiceImpl implements WebsiteReviewService {
                 .build();
     }
 }
-

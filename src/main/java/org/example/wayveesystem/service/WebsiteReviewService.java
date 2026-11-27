@@ -10,6 +10,8 @@ import java.util.List;
 
 public interface WebsiteReviewService {
     WebsiteReviewResponse createWebsiteReview(WebsiteReviewRequest request);
+    WebsiteReviewResponse updateWebsiteReview(Long id, WebsiteReviewRequest request);
+    void deleteWebsiteReview(Long id);
     List<WebsiteReviewResponse> getAllWebsiteReviews(Integer rating, String category, String keyword);
     WebsiteReviewStatsResponse getWebsiteReviewStats();
     List<WebsiteReviewResponse> getMyWebsiteReviews();
@@ -17,4 +19,3 @@ public interface WebsiteReviewService {
     WebsiteReviewResponse deleteReply(Long id);
     ImageUploadResponse uploadMedia(MultipartFile file);
 }
-
